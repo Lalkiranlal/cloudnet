@@ -3,14 +3,12 @@ import {
   Bot, 
   X, 
   Send, 
-  Sparkles, 
-  MessageSquare, 
   RotateCcw, 
   ArrowUpRight, 
   MapPin, 
-  ShieldCheck, 
   CheckCircle2,
-  ChevronDown
+  Sparkles,
+  Info
 } from 'lucide-react';
 import { WeatherEvent, EventCategory, WeatherMood } from '../types/weather';
 import { generateAIWeatherResponse, ChatMessage } from '../services/aiWeatherAssistant';
@@ -27,7 +25,7 @@ const INITIAL_MESSAGES: ChatMessage[] = [
   {
     id: 'msg-init-1',
     sender: 'bot',
-    text: `👋 **Welcome to CloudNet AI Weather Copilot!**\n\nI analyze live synoptic observations, Twitter #IMD feeds, and citizen reports across India.\n\n*Ask me about any city, active weather warnings, or safety precautions.*`,
+    text: `👋 Welcome to CloudNet AI Weather Copilot!\n\nI analyze live synoptic observations, Twitter #IMD feeds, and citizen reports across India.\n\nAsk me about any city, active weather warnings, or safety precautions.`,
     timestamp: 'Just now'
   }
 ];
@@ -40,6 +38,64 @@ const SUGGESTED_QUESTIONS = [
   '📊 System accuracy & spam stats?',
   '🚨 Emergency helpline numbers?'
 ];
+
+// Helper to format text with bold, bullets, and clean line breaks without raw markdown symbols
+function FormattedMessage({ text, isUser }: { text: string; isUser: boolean }) {
+  if (isUser) {
+    return <div className="text-white text-xs font-medium">{text}</div>;
+  }
+
+  // Split lines
+  const lines = text.split('\n');
+
+  return (
+    <div className="space-y-1.5 text-xs leading-relaxed text-slate-800">
+      {lines.map((line, lIdx) => {
+        const trimmed = line.trim();
+        if (!trimmed) return <div key={lIdx} className="h-1" />;
+
+        const isBullet = trimmed.startsWith('•') || trimmed.startsWith('-');
+        const cleanContent = isBullet ? trimmed.replace(/^[•\-]\s*/, '') : trimmed;
+
+        // Parse **bold** and *italic*
+        const parts = cleanContent.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+
+        const renderedLine = parts.map((part, pIdx) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return (
+              <strong key={pIdx} className="font-bold text-slate-900">
+                {part.slice(2, -2)}
+              </strong>
+            );
+          }
+          if (part.startsWith('*') && part.endsWith('*')) {
+            return (
+              <em key={pIdx} className="italic text-slate-600">
+                {part.slice(1, -1)}
+              </em>
+            );
+          }
+          return <span key={pIdx}>{part}</span>;
+        });
+
+        if (isBullet) {
+          return (
+            <div key={lIdx} className="flex items-start space-x-2 pl-1">
+              <span className="text-sky-500 font-bold leading-none mt-1">•</span>
+              <div className="flex-1">{renderedLine}</div>
+            </div>
+          );
+        }
+
+        return (
+          <div key={lIdx} className={trimmed.startsWith('📍') || trimmed.startsWith('📊') || trimmed.startsWith('🚨') ? 'font-semibold text-slate-900 pb-0.5' : ''}>
+            {renderedLine}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export const WeatherAIChatbot: React.FC<WeatherAIChatbotProps> = ({
   events,
@@ -84,7 +140,7 @@ export const WeatherAIChatbot: React.FC<WeatherAIChatbotProps> = ({
       const botResponse = generateAIWeatherResponse(query, events);
       setMessages(prev => [...prev, botResponse]);
       setIsTyping(false);
-    }, 600);
+    }, 500);
   };
 
   const handleExecuteAction = (action?: ChatMessage['suggestedAction']) => {
@@ -186,13 +242,13 @@ export const WeatherAIChatbot: React.FC<WeatherAIChatbotProps> = ({
                 className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
               >
                 <div
-                  className={`max-w-[85%] p-3.5 rounded-2xl leading-relaxed whitespace-pre-wrap ${
+                  className={`max-w-[88%] p-3.5 rounded-2xl leading-relaxed shadow-sm ${
                     msg.sender === 'user'
-                      ? 'bg-gradient-to-r from-sky-600 to-blue-600 text-white shadow-md shadow-sky-600/10 rounded-br-none font-medium'
-                      : 'bg-white text-slate-800 border border-slate-100 shadow-sm rounded-bl-none'
+                      ? 'bg-gradient-to-r from-sky-600 to-blue-600 text-white shadow-sky-600/10 rounded-br-none font-medium'
+                      : 'bg-white text-slate-800 border border-slate-100 rounded-bl-none'
                   }`}
                 >
-                  {msg.text}
+                  <FormattedMessage text={msg.text} isUser={msg.sender === 'user'} />
 
                   {/* Interactive Action Button (if attached) */}
                   {msg.suggestedAction && (
@@ -218,7 +274,7 @@ export const WeatherAIChatbot: React.FC<WeatherAIChatbotProps> = ({
             {isTyping && (
               <div className="flex items-center space-x-2 text-slate-400 p-2 text-xs">
                 <Bot className="w-4 h-4 text-sky-600 animate-spin" />
-                <span className="font-medium animate-pulse">Analyzing meteorological data...</span>
+                <span className="font-medium animate-pulse">Analyzing meteorological telemetry...</span>
               </div>
             )}
 
