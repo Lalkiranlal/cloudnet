@@ -14,8 +14,9 @@ import { CitizenReportModal } from './components/CitizenReportModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { EventDetailModal } from './components/EventDetailModal';
 import { WeatherAtmosphere } from './components/WeatherAtmosphere';
+import { WeatherAIChatbot } from './components/WeatherAIChatbot';
 
-import { WeatherEvent, FilterState, WeatherMood } from './types/weather';
+import { WeatherEvent, FilterState, WeatherMood, EventCategory } from './types/weather';
 import { MOOD_THEMES } from './data/initialEvents';
 import { getStoredEvents, getAdminAuthState } from './services/storage';
 import { fetchLiveCityWeather } from './services/weatherApi';
@@ -363,6 +364,26 @@ export const App: React.FC = () => {
       <EventDetailModal
         event={inspectedEvent}
         onClose={() => setInspectedEvent(null)}
+      />
+
+      {/* AI Weather Copilot Chatbot */}
+      <WeatherAIChatbot
+        events={events}
+        onSelectEvent={handleSelectEvent}
+        onFilterCategory={(cat: EventCategory) => {
+          setFilter(prev => ({ ...prev, categories: [cat] }));
+          setActiveMood(cat);
+          setActiveTab('dashboard');
+        }}
+        onFocusCity={(cityName: string) => {
+          const matched = events.find(e => e.city.toLowerCase() === cityName.toLowerCase());
+          if (matched) {
+            setSelectedEvent(matched);
+            setActiveMood(matched.category);
+            setActiveTab('dashboard');
+          }
+        }}
+        onMoodChange={(mood) => setActiveMood(mood)}
       />
 
     </div>
