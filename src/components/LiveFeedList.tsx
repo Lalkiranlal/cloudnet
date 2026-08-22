@@ -8,7 +8,7 @@ import {
   CloudRain
 } from 'lucide-react';
 import { Twitter } from './icons/TwitterIcon';
-import { WeatherEvent } from '../types/weather';
+import { WeatherEvent, WeatherMood } from '../types/weather';
 import { CATEGORY_CONFIG } from '../data/initialEvents';
 
 interface LiveFeedListProps {
@@ -16,13 +16,15 @@ interface LiveFeedListProps {
   selectedEvent: WeatherEvent | null;
   onSelectEvent: (event: WeatherEvent) => void;
   onOpenDetails: (event: WeatherEvent) => void;
+  onMoodChange?: (mood: WeatherMood) => void;
 }
 
 export const LiveFeedList: React.FC<LiveFeedListProps> = ({
   events,
   selectedEvent,
   onSelectEvent,
-  onOpenDetails
+  onOpenDetails,
+  onMoodChange
 }) => {
 
   const formatTimeAgo = (isoString: string) => {
@@ -44,38 +46,46 @@ export const LiveFeedList: React.FC<LiveFeedListProps> = ({
   const getSourceIcon = (source: string) => {
     switch (source) {
       case 'twitter':
-        return <Twitter className="w-3 h-3 text-slate-400" />;
+        return <Twitter className="w-3.5 h-3.5 text-sky-500" />;
       case 'api':
-        return <Radio className="w-3 h-3 text-slate-400" />;
+        return <Radio className="w-3.5 h-3.5 text-teal-600" />;
       case 'citizen':
-        return <Users className="w-3 h-3 text-slate-400" />;
+        return <Users className="w-3.5 h-3.5 text-purple-600" />;
       default:
         return null;
     }
   };
 
+  const handleClickItem = (event: WeatherEvent) => {
+    onSelectEvent(event);
+    if (onMoodChange) {
+      onMoodChange(event.category);
+    }
+  };
+
   return (
-    <div className="matte-card rounded-xl overflow-hidden flex flex-col h-[540px]">
+    <div className="glass-card rounded-3xl overflow-hidden flex flex-col h-[560px] shadow-lg border border-white/80">
       
       {/* Header */}
-      <div className="p-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
+      <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white/60">
         <div className="flex items-center space-x-2">
-          <span className="w-2 h-2 rounded-full bg-sky-400"></span>
-          <h3 className="text-xs font-semibold text-slate-200 uppercase tracking-wider">
-            Live Stream Feed
+          <span className="w-2.5 h-2.5 rounded-full bg-sky-500 animate-pulse"></span>
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+            Real-Time Weather Feed
           </h3>
         </div>
-        <span className="text-[11px] font-mono px-2 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">
+        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
           {events.length} reports
         </span>
       </div>
 
       {/* Scrollable Event List */}
-      <div className="flex-1 overflow-y-auto p-2.5 space-y-2 divide-y divide-slate-800/40">
+      <div className="flex-1 overflow-y-auto p-3 space-y-2.5 divide-y divide-slate-100">
         {events.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
-            <CloudRain className="w-8 h-8 text-slate-600 mb-2" />
-            <p className="text-xs font-medium">No weather incidents match current filters</p>
+            <CloudRain className="w-10 h-10 text-slate-300 mb-2" />
+            <p className="text-sm font-semibold text-slate-600">No matching weather reports</p>
+            <p className="text-xs text-slate-400 mt-1">Try selecting another category or state</p>
           </div>
         ) : (
           events.map(event => {
@@ -85,39 +95,40 @@ export const LiveFeedList: React.FC<LiveFeedListProps> = ({
             return (
               <div
                 key={event.id}
-                onClick={() => onSelectEvent(event)}
-                className={`pt-2 first:pt-0 p-3 rounded-lg transition-colors cursor-pointer group ${
+                onClick={() => handleClickItem(event)}
+                className={`pt-2.5 first:pt-0 p-3.5 rounded-2xl transition-all cursor-pointer group ${
                   isSelected
-                    ? 'bg-slate-800/90 border border-sky-500/40'
-                    : 'hover:bg-slate-850/60 border border-transparent'
+                    ? 'bg-sky-50/90 border-2 border-sky-400 shadow-sm'
+                    : 'hover:bg-white/80 border border-transparent hover:border-slate-200'
                 }`}
               >
                 {/* Category & Status Row */}
                 <div className="flex items-center justify-between mb-1.5">
                   <span 
-                    className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded"
-                    style={{ background: 'rgba(255,255,255,0.06)', color: config.color, border: '1px solid rgba(255,255,255,0.1)' }}
+                    className="text-xs font-bold px-2.5 py-0.5 rounded-lg flex items-center space-x-1"
+                    style={{ background: config.bgHex, color: config.color, border: `1px solid ${config.color}30` }}
                   >
-                    {config.label}
+                    <span>{config.emoji}</span>
+                    <span>{config.label}</span>
                   </span>
 
                   <div className="flex items-center space-x-1.5">
-                    <span className={`text-[10px] font-mono uppercase px-1.5 py-0.2 rounded ${
+                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
                       event.verificationStatus === 'verified'
-                        ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800'
+                        ? 'bg-emerald-100 text-emerald-800'
                         : event.verificationStatus === 'flagged'
-                        ? 'bg-rose-950/60 text-rose-400 border border-rose-800'
+                        ? 'bg-rose-100 text-rose-800'
                         : event.verificationStatus === 'duplicate'
-                        ? 'bg-purple-950/60 text-purple-400 border border-purple-800'
-                        : 'bg-amber-950/60 text-amber-400 border border-amber-800'
+                        ? 'bg-purple-100 text-purple-800'
+                        : 'bg-amber-100 text-amber-800'
                     }`}>
                       {event.verificationStatus}
                     </span>
 
-                    <span className={`text-[10px] font-mono px-1 py-0.2 rounded ${
-                      event.severity === 'extreme' ? 'bg-rose-950 text-rose-300 font-bold border border-rose-800' :
-                      event.severity === 'severe' ? 'bg-amber-950 text-amber-300 font-medium border border-amber-800' :
-                      'bg-slate-900 text-slate-400 border border-slate-800'
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                      event.severity === 'extreme' ? 'bg-rose-600 text-white' :
+                      event.severity === 'severe' ? 'bg-orange-500 text-white' :
+                      'bg-slate-100 text-slate-600'
                     }`}>
                       {event.severity.toUpperCase()}
                     </span>
@@ -125,33 +136,33 @@ export const LiveFeedList: React.FC<LiveFeedListProps> = ({
                 </div>
 
                 {/* Title */}
-                <h4 className="text-xs font-medium text-slate-100 group-hover:text-sky-300 transition-colors line-clamp-1">
+                <h4 className="text-xs font-bold text-slate-900 group-hover:text-sky-700 transition-colors line-clamp-1">
                   {event.title}
                 </h4>
 
                 {/* Description snippet */}
-                <p className="text-[11px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+                <p className="text-xs text-slate-600 mt-1 line-clamp-2 leading-relaxed">
                   {event.description}
                 </p>
 
                 {/* Metadata & Footer */}
-                <div className="mt-2.5 flex items-center justify-between text-[10px] text-slate-400 pt-1.5 border-t border-slate-800/60">
+                <div className="mt-2.5 flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
                   <div className="flex items-center space-x-2">
-                    <span className="flex items-center font-medium text-slate-300">
-                      <MapPin className="w-2.5 h-2.5 text-slate-400 mr-1" />
+                    <span className="flex items-center font-bold text-slate-700">
+                      <MapPin className="w-3.5 h-3.5 text-sky-600 mr-1" />
                       {event.city}, {event.state}
                     </span>
 
-                    <span className="flex items-center text-slate-500 font-mono">
-                      <Clock className="w-2.5 h-2.5 mr-0.5" />
+                    <span className="flex items-center text-slate-400 font-medium text-[11px]">
+                      <Clock className="w-3 h-3 mr-0.5" />
                       {formatTimeAgo(event.timestamp)}
                     </span>
                   </div>
 
                   <div className="flex items-center space-x-2">
-                    <span className="flex items-center space-x-1 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                    <span className="flex items-center space-x-1 bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-[11px] font-medium text-slate-700">
                       {getSourceIcon(event.source)}
-                      <span className="capitalize text-slate-300">{event.source}</span>
+                      <span className="capitalize">{event.source}</span>
                     </span>
 
                     <button
@@ -159,10 +170,10 @@ export const LiveFeedList: React.FC<LiveFeedListProps> = ({
                         e.stopPropagation();
                         onOpenDetails(event);
                       }}
-                      className="p-0.5 rounded text-slate-400 hover:text-sky-300 transition-colors"
+                      className="p-1 rounded-lg text-slate-400 hover:text-sky-700 hover:bg-slate-100 transition-colors"
                       title="Inspect Details"
                     >
-                      <ChevronRight className="w-3.5 h-3.5" />
+                      <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>

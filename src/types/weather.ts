@@ -13,6 +13,20 @@ export type VerificationStatus = 'verified' | 'unverified' | 'flagged' | 'duplic
 
 export type SeverityLevel = 'low' | 'moderate' | 'severe' | 'extreme';
 
+export type WeatherMood = 'default' | EventCategory;
+
+export interface MoodTheme {
+  id: WeatherMood;
+  label: string;
+  emoji: string;
+  bgGradient: string;
+  accentColor: string;
+  badgeBg: string;
+  badgeText: string;
+  description: string;
+  headerSubtitle: string;
+}
+
 export interface WeatherEvent {
   id: string;
   source: ReportSource;
@@ -72,6 +86,7 @@ export interface FilterState {
 export interface CategoryMeta {
   id: EventCategory;
   label: string;
+  emoji: string;
   color: string;
   bgHex: string;
   badgeBg: string;

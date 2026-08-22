@@ -52,13 +52,13 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ events }) => {
 
   const categoryLabels = categoriesList.map(cat => CATEGORY_CONFIG[cat].label);
   const categoryColors = [
-    '#38bdf8', // rainfall
-    '#c084fc', // thunderstorm
-    '#60a5fa', // flooding
-    '#fb923c', // heatwave
-    '#94a3b8', // fog
-    '#facc15', // dust storm
-    '#2dd4bf', // strong wind
+    '#0284c7', // rainfall
+    '#7c3aed', // thunderstorm
+    '#0369a1', // flooding
+    '#ea580c', // heatwave
+    '#475569', // fog
+    '#ca8a04', // dust storm
+    '#0d9488', // strong wind
   ];
 
   const doughnutData = {
@@ -67,9 +67,9 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ events }) => {
       {
         data: categoryCounts,
         backgroundColor: categoryColors,
-        borderColor: '#0d162b',
-        borderWidth: 2,
-        hoverOffset: 4
+        borderColor: '#ffffff',
+        borderWidth: 3,
+        hoverOffset: 6
       }
     ]
   };
@@ -81,19 +81,19 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ events }) => {
       legend: {
         position: 'right' as const,
         labels: {
-          color: '#94a3b8',
-          font: { size: 11, family: 'Inter, sans-serif' },
-          boxWidth: 10,
-          padding: 8
+          color: '#334155',
+          font: { size: 12, family: 'Inter, sans-serif', weight: 600 as any },
+          boxWidth: 12,
+          padding: 10
         }
       },
       tooltip: {
         backgroundColor: '#0f172a',
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        borderColor: '#e2e8f0',
         borderWidth: 1,
-        titleColor: '#f1f5f9',
-        bodyColor: '#cbd5e1',
-        padding: 8
+        titleColor: '#f8fafc',
+        bodyColor: '#e2e8f0',
+        padding: 10
       }
     }
   };
@@ -114,10 +114,10 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ events }) => {
       {
         label: 'Weather Incidents Recorded',
         data: sortedStates.map(s => s[1]),
-        backgroundColor: 'rgba(56, 189, 248, 0.5)',
-        borderColor: '#38bdf8',
+        backgroundColor: 'rgba(2, 132, 199, 0.75)',
+        borderColor: '#0284c7',
         borderWidth: 1,
-        borderRadius: 4
+        borderRadius: 8
       }
     ]
   };
@@ -130,20 +130,18 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ events }) => {
       legend: { display: false },
       tooltip: {
         backgroundColor: '#0f172a',
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-        borderWidth: 1,
-        titleColor: '#f1f5f9',
-        bodyColor: '#cbd5e1'
+        titleColor: '#f8fafc',
+        bodyColor: '#e2e8f0'
       }
     },
     scales: {
       x: {
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#64748b', font: { size: 10, family: 'monospace' } }
+        grid: { color: '#f1f5f9' },
+        ticks: { color: '#64748b', font: { size: 11, family: 'Inter' } }
       },
       y: {
         grid: { display: false },
-        ticks: { color: '#cbd5e1', font: { size: 11, family: 'Inter' } }
+        ticks: { color: '#1e293b', font: { size: 12, family: 'Inter', weight: 600 as any } }
       }
     }
   };
@@ -159,13 +157,13 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ events }) => {
         label: 'Hourly Incident Ingestion Rate',
         data: trendData,
         fill: true,
-        borderColor: '#38bdf8',
-        backgroundColor: 'rgba(56, 189, 248, 0.08)',
-        tension: 0.3,
-        pointBackgroundColor: '#38bdf8',
-        pointBorderColor: '#0d162b',
+        borderColor: '#0284c7',
+        backgroundColor: 'rgba(2, 132, 199, 0.08)',
+        tension: 0.35,
+        pointBackgroundColor: '#0284c7',
+        pointBorderColor: '#ffffff',
         pointBorderWidth: 2,
-        pointRadius: 3
+        pointRadius: 4
       }
     ]
   };
@@ -177,104 +175,102 @@ export const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ events }) => {
       legend: { display: false },
       tooltip: {
         backgroundColor: '#0f172a',
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-        borderWidth: 1,
-        titleColor: '#f1f5f9',
-        bodyColor: '#cbd5e1'
+        titleColor: '#f8fafc',
+        bodyColor: '#e2e8f0'
       }
     },
     scales: {
       x: {
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#64748b', font: { size: 10, family: 'monospace' } }
+        grid: { color: '#f1f5f9' },
+        ticks: { color: '#64748b', font: { size: 11, family: 'Inter' } }
       },
       y: {
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#64748b', font: { size: 10, family: 'monospace' } }
+        grid: { color: '#f1f5f9' },
+        ticks: { color: '#64748b', font: { size: 11, family: 'Inter' } }
       }
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       
       {/* Header Banner */}
-      <div className="matte-card p-4 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="glass-card p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2">
-            <Activity className="w-4 h-4 text-sky-400" />
-            <h2 className="text-sm font-semibold text-white">
-              Meteorological Trend & Geographic Distribution Analytics
+            <Activity className="w-5 h-5 text-sky-600" />
+            <h2 className="text-base font-bold text-slate-900">
+              National Weather Trend & Regional Hotspots Analytics
             </h2>
           </div>
-          <p className="text-[11px] text-slate-400 mt-0.5">
-            Aggregation across 7 IMD disaster categories and Indian geographic regions.
+          <p className="text-xs text-slate-500 mt-1">
+            Real-time multi-source data visualization across 7 IMD categories and Indian states.
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 text-xs">
-          <div className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-300 text-[11px]">
-            Dataset: <strong className="text-sky-400 font-mono">{events.length}</strong>
+        <div className="flex items-center space-x-3 text-xs">
+          <div className="px-3 py-1.5 rounded-xl bg-sky-50 border border-sky-200 text-sky-900 font-semibold">
+            Total Ingested: <strong className="font-mono">{events.length}</strong>
           </div>
         </div>
       </div>
 
       {/* Grid of 3 Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Chart 1: Category Breakdown Doughnut */}
-        <div className="lg:col-span-6 matte-card p-4 rounded-xl flex flex-col">
-          <div className="flex items-center justify-between mb-3">
+        <div className="lg:col-span-6 glass-card p-5 rounded-3xl flex flex-col shadow-md">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
-              <PieChart className="w-3.5 h-3.5 text-slate-400" />
-              <h3 className="text-xs font-semibold text-slate-200 uppercase tracking-wider">
-                Category Breakdown (7 Types)
+              <PieChart className="w-4 h-4 text-sky-600" />
+              <h3 className="text-sm font-bold text-slate-900">
+                Weather Category Distribution
               </h3>
             </div>
-            <span className="text-[10px] font-mono text-slate-500">
-              Distribution
+            <span className="text-xs font-semibold text-slate-400">
+              7 IMD Categories
             </span>
           </div>
 
-          <div className="h-60 relative flex items-center justify-center">
+          <div className="h-64 relative flex items-center justify-center">
             <Doughnut data={doughnutData} options={doughnutOptions} />
           </div>
         </div>
 
         {/* Chart 2: Top Affected States Bar Chart */}
-        <div className="lg:col-span-6 matte-card p-4 rounded-xl flex flex-col">
-          <div className="flex items-center justify-between mb-3">
+        <div className="lg:col-span-6 glass-card p-5 rounded-3xl flex flex-col shadow-md">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
-              <BarChart2 className="w-3.5 h-3.5 text-slate-400" />
-              <h3 className="text-xs font-semibold text-slate-200 uppercase tracking-wider">
-                Top Affected States & Hotspots
+              <BarChart2 className="w-4 h-4 text-sky-600" />
+              <h3 className="text-sm font-bold text-slate-900">
+                Top Affected Indian States
               </h3>
             </div>
-            <span className="text-[10px] font-mono text-slate-500">
-              Ranked
+            <span className="text-xs font-semibold text-slate-400">
+              Ranked by Incidents
             </span>
           </div>
 
-          <div className="h-60 relative">
+          <div className="h-64 relative">
             <Bar data={barData} options={barOptions} />
           </div>
         </div>
 
         {/* Chart 3: 24h Trendline Full Width */}
-        <div className="lg:col-span-12 matte-card p-4 rounded-xl flex flex-col">
-          <div className="flex items-center justify-between mb-3">
+        <div className="lg:col-span-12 glass-card p-5 rounded-3xl flex flex-col shadow-md">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
-              <TrendingUp className="w-3.5 h-3.5 text-slate-400" />
-              <h3 className="text-xs font-semibold text-slate-200 uppercase tracking-wider">
-                24-Hour Temporal Ingestion Pattern
+              <TrendingUp className="w-4 h-4 text-emerald-600" />
+              <h3 className="text-sm font-bold text-slate-900">
+                24-Hour Temporal Incident Ingestion Trend
               </h3>
             </div>
-            <span className="text-[10px] font-mono text-slate-400 bg-slate-900 px-2 py-0.2 rounded border border-slate-800">
-              Diurnal Cycle
+            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+              Live Feed Connected
             </span>
           </div>
 
-          <div className="h-52 relative">
+          <div className="h-60 relative">
             <Line data={lineData} options={lineOptions} />
           </div>
         </div>

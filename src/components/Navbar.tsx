@@ -2,14 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { 
   Cloud, 
   Map, 
-  BarChart2, 
-  Plus, 
+  BarChart3, 
+  PlusCircle, 
   Lock, 
   Unlock, 
   ShieldCheck,
-  Server,
+  Radio,
+  RotateCcw,
+  Sparkles,
   Layers
 } from 'lucide-react';
+import { WeatherMood, MoodTheme } from '../types/weather';
+import { MOOD_THEMES } from '../data/initialEvents';
 import { setAdminAuthState } from '../services/storage';
 
 interface NavbarProps {
@@ -19,6 +23,8 @@ interface NavbarProps {
   onOpenAdminLoginModal: () => void;
   isAdminAuthenticated: boolean;
   setIsAdminAuthenticated: (authed: boolean) => void;
+  activeMood: WeatherMood;
+  setActiveMood: (mood: WeatherMood) => void;
   totalEventsCount: number;
 }
 
@@ -29,9 +35,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAdminLoginModal,
   isAdminAuthenticated,
   setIsAdminAuthenticated,
+  activeMood,
+  setActiveMood,
   totalEventsCount
 }) => {
   const [istTime, setIstTime] = useState<string>('');
+  const currentMoodTheme = MOOD_THEMES[activeMood] || MOOD_THEMES.default;
 
   useEffect(() => {
     const updateTime = () => {
@@ -63,159 +72,186 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-[#080e1d] border-b border-slate-800/80 transition-all shadow-sm">
-      <div className="max-w-7xl mx-auto px-6 sm:px-8">
-        <div className="flex items-center justify-between h-16">
+    <header className="sticky top-0 z-40 w-full glass-nav transition-all duration-300 shadow-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-18 py-2">
           
           {/* Brand & Logo */}
           <div 
-            className="flex items-center space-x-3.5 cursor-pointer py-1" 
-            onClick={() => setActiveTab('dashboard')}
+            className="flex items-center space-x-3 cursor-pointer select-none" 
+            onClick={() => {
+              setActiveTab('dashboard');
+              setActiveMood('default');
+            }}
           >
-            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-slate-800/90 border border-slate-700 text-sky-400">
-              <Cloud className="w-5 h-5 stroke-[2.2]" />
+            <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/20">
+              <Cloud className="w-5 h-5 stroke-[2.5]" />
             </div>
             
-            <div className="flex flex-col">
+            <div>
               <div className="flex items-center space-x-2">
-                <span className="text-base font-bold tracking-tight text-white font-sans">
-                  CLOUD NET
+                <span className="text-xl font-bold tracking-tight text-slate-900 font-sans">
+                  CloudNet
                 </span>
-                <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                  IMD v2.6
+                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-200">
+                  IMD Official
                 </span>
               </div>
-              <span className="text-[11px] text-slate-400 font-normal">
-                National Weather Monitoring & Verification
-              </span>
+              <p className="text-xs text-slate-500 font-medium">
+                {currentMoodTheme.headerSubtitle}
+              </p>
             </div>
           </div>
 
-          {/* Centered Navigation Tabs - Clean Matte Pill Box */}
-          <nav className="hidden md:flex items-center space-x-1 bg-slate-900/90 p-1 rounded-lg border border-slate-800">
+          {/* Center Navigation Tabs (Frosted Pill Style) */}
+          <nav className="hidden md:flex items-center space-x-1.5 p-1 rounded-xl bg-slate-100/90 border border-slate-200 shadow-inner">
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'dashboard'
-                  ? 'bg-slate-800 text-sky-400 font-semibold shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
+                  ? 'bg-white text-sky-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
               <Map className="w-3.5 h-3.5" />
-              <span>Map & Live Stream</span>
+              <span>Live Map & Feed</span>
             </button>
 
             <button
               onClick={() => setActiveTab('analytics')}
-              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'analytics'
-                  ? 'bg-slate-800 text-sky-400 font-semibold shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
+                  ? 'bg-white text-sky-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
-              <BarChart2 className="w-3.5 h-3.5" />
-              <span>Analytics & Trends</span>
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Trends & Charts</span>
             </button>
 
             <button
               onClick={() => setActiveTab('admin')}
-              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'admin'
-                  ? 'bg-slate-800 text-sky-400 font-semibold shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
+                  ? 'bg-white text-sky-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Admin Verification</span>
+              <span>Admin Verify</span>
               {isAdminAuthenticated && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
               )}
             </button>
 
             <button
               onClick={() => setActiveTab('feeds')}
-              className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'feeds'
-                  ? 'bg-slate-800 text-sky-400 font-semibold shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850'
+                  ? 'bg-white text-sky-700 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
-              <Server className="w-3.5 h-3.5" />
+              <Radio className="w-3.5 h-3.5" />
               <span>Data Feeds</span>
             </button>
           </nav>
 
-          {/* Right Section: IST Time, Report CTA, Admin Toggle */}
-          <div className="flex items-center space-x-4">
+          {/* Right Action Area */}
+          <div className="flex items-center space-x-3">
             
-            {/* Matte IST Clock */}
-            <div className="hidden lg:flex items-center space-x-2 text-xs font-mono text-slate-400 bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-800">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              <span className="text-slate-300 font-medium">{istTime || 'IST Live'}</span>
+            {/* Active Weather Mood Badge (Interactive) */}
+            <div 
+              className={`hidden lg:flex items-center space-x-2 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all shadow-sm ${currentMoodTheme.badgeBg} ${currentMoodTheme.badgeText}`}
+              title="Current Weather Mood Theme"
+            >
+              <span className="text-base">{currentMoodTheme.emoji}</span>
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">Weather Mood</span>
+                <span className="font-semibold">{currentMoodTheme.label}</span>
+              </div>
+              {activeMood !== 'default' && (
+                <button
+                  onClick={() => setActiveMood('default')}
+                  className="ml-1 p-1 hover:bg-black/10 rounded-md text-slate-600 transition-colors"
+                  title="Reset to Normal Daytime Mood"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                </button>
+              )}
             </div>
 
-            {/* Citizen Report Action Button - Clean Solid Slate/Sky Style */}
+            {/* Quick IST Clock */}
+            <div className="hidden xl:flex flex-col text-right text-xs font-mono text-slate-500 px-2">
+              <span className="text-slate-800 font-semibold">{istTime || 'IST Live'}</span>
+              <span className="text-[10px] text-emerald-600 font-sans font-medium flex items-center justify-end">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse"></span> Live Sensors
+              </span>
+            </div>
+
+            {/* Citizen Report Action Button (Prominent & Friendly) */}
             <button
               onClick={onOpenCitizenModal}
-              className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs transition-colors cursor-pointer shadow-sm"
+              className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold text-xs shadow-md shadow-sky-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <PlusCircle className="w-4 h-4 stroke-[2.5]" />
               <span>Report Weather</span>
             </button>
 
-            {/* Admin Toggle Button */}
+            {/* Admin Toggle */}
             <button
               onClick={handleAdminToggle}
               title={isAdminAuthenticated ? "Officer Authenticated (Click to Logout)" : "Admin Officer Login"}
-              className={`p-2 rounded-lg border transition-colors ${
+              className={`p-2.5 rounded-xl border transition-all ${
                 isAdminAuthenticated
-                  ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800 hover:bg-emerald-900/40'
-                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                  : 'bg-white text-slate-500 border-slate-200 hover:text-slate-800 hover:bg-slate-50'
               }`}
             >
               {isAdminAuthenticated ? (
-                <Unlock className="w-3.5 h-3.5" />
+                <Unlock className="w-4 h-4" />
               ) : (
-                <Lock className="w-3.5 h-3.5" />
+                <Lock className="w-4 h-4" />
               )}
             </button>
+
           </div>
 
         </div>
 
         {/* Mobile Navigation bar */}
-        <div className="flex md:hidden items-center justify-around py-2 border-t border-slate-800/80">
+        <div className="flex md:hidden items-center justify-around py-2 border-t border-slate-200/80">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`text-xs py-1 px-2.5 rounded font-medium ${
-              activeTab === 'dashboard' ? 'text-sky-400 bg-slate-800' : 'text-slate-400'
+            className={`text-xs py-1.5 px-3 rounded-lg font-semibold ${
+              activeTab === 'dashboard' ? 'text-sky-700 bg-sky-100' : 'text-slate-600'
             }`}
           >
-            Map & Feed
+            🗺️ Map & Feed
           </button>
           <button
             onClick={() => setActiveTab('analytics')}
-            className={`text-xs py-1 px-2.5 rounded font-medium ${
-              activeTab === 'analytics' ? 'text-sky-400 bg-slate-800' : 'text-slate-400'
+            className={`text-xs py-1.5 px-3 rounded-lg font-semibold ${
+              activeTab === 'analytics' ? 'text-sky-700 bg-sky-100' : 'text-slate-600'
             }`}
           >
-            Analytics
+            📊 Charts
           </button>
           <button
             onClick={() => setActiveTab('admin')}
-            className={`text-xs py-1 px-2.5 rounded font-medium ${
-              activeTab === 'admin' ? 'text-sky-400 bg-slate-800' : 'text-slate-400'
+            className={`text-xs py-1.5 px-3 rounded-lg font-semibold ${
+              activeTab === 'admin' ? 'text-sky-700 bg-sky-100' : 'text-slate-600'
             }`}
           >
-            Admin
+            🛡️ Admin
           </button>
           <button
             onClick={() => setActiveTab('feeds')}
-            className={`text-xs py-1 px-2.5 rounded font-medium ${
-              activeTab === 'feeds' ? 'text-sky-400 bg-slate-800' : 'text-slate-400'
+            className={`text-xs py-1.5 px-3 rounded-lg font-semibold ${
+              activeTab === 'feeds' ? 'text-sky-700 bg-sky-100' : 'text-slate-600'
             }`}
           >
-            Feeds
+            📡 Feeds
           </button>
         </div>
 

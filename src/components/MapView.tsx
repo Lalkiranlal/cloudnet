@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { WeatherEvent } from '../types/weather';
+import { WeatherEvent, EventCategory, WeatherMood } from '../types/weather';
 import { CATEGORY_CONFIG } from '../data/initialEvents';
 import { 
   Crosshair, 
   Maximize2, 
-  Radio
+  Radio, 
+  Sparkles,
+  Info
 } from 'lucide-react';
 
 interface MapViewProps {
@@ -13,19 +15,21 @@ interface MapViewProps {
   selectedEvent: WeatherEvent | null;
   onSelectEvent: (event: WeatherEvent) => void;
   onOpenReportModal: () => void;
+  onMoodChange?: (mood: WeatherMood) => void;
 }
 
 export const MapView: React.FC<MapViewProps> = ({
   events,
   selectedEvent,
-  onSelectEvent
+  onSelectEvent,
+  onMoodChange
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersGroupRef = useRef<L.LayerGroup | null>(null);
   const [pulseEnabled, setPulseEnabled] = useState<boolean>(true);
 
-  // Initialize Map
+  // Initialize Leaflet Map with Light CartoDB Voyager Tiles
   useEffect(() => {
     if (!mapContainerRef.current) return;
     if (mapInstanceRef.current) return;
@@ -38,9 +42,9 @@ export const MapView: React.FC<MapViewProps> = ({
       zoomControl: false
     });
 
-    // Clean Dark Map Tiles
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+    // Light CartoDB Voyager Basemap for clean, bright, friendly readability
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://carto.com/">CARTO</a> | IMD Open Data',
       subdomains: 'abcd',
       maxZoom: 19
     }).addTo(map);
@@ -56,7 +60,7 @@ export const MapView: React.FC<MapViewProps> = ({
     };
   }, []);
 
-  // Update Markers
+  // Update Markers when events or pulse state changes
   useEffect(() => {
     if (!mapInstanceRef.current || !markersGroupRef.current) return;
 
@@ -69,20 +73,16 @@ export const MapView: React.FC<MapViewProps> = ({
       const isSevere = event.severity === 'severe' || event.severity === 'extreme';
       const isSelected = selectedEvent?.id === event.id;
 
+      // Custom Clean Frosted HTML Marker Pin
       const markerHtml = `
-        <div class="relative flex items-center justify-center cursor-pointer group" style="width: 32px; height: 32px;">
+        <div class="relative flex items-center justify-center cursor-pointer group" style="width: 38px; height: 38px;">
           ${pulseEnabled && isSevere ? `
-            <div class="pulse-ring absolute rounded-full" style="width: 34px; height: 34px; background-color: ${config.color}; opacity: 0.35;"></div>
+            <div class="pulse-ring-light absolute rounded-full" style="width: 40px; height: 40px; background-color: ${config.color}; opacity: 0.35;"></div>
           ` : ''}
-          <div class="weather-marker-pin relative z-10 flex items-center justify-center rounded-full transition-transform ${isSelected ? 'scale-125' : ''}" 
-               style="width: 28px; height: 28px; background: #0b1325; border: 2px solid ${config.color};">
-            <span style="font-size: 13px;">
-              ${event.category === 'rainfall' ? '🌧' :
-                event.category === 'thunderstorm' ? '⚡' :
-                event.category === 'flooding' ? '🌊' :
-                event.category === 'heatwave' ? '🔥' :
-                event.category === 'fog' ? '🌫' :
-                event.category === 'dust storm' ? '🌪' : '💨'}
+          <div class="custom-weather-pin relative z-10 flex items-center justify-center rounded-2xl shadow-md transition-transform ${isSelected ? 'scale-125 ring-4 ring-sky-400' : ''}" 
+               style="width: 32px; height: 32px; background: #ffffff; border: 2px solid ${config.color}; box-shadow: 0 4px 12px rgba(0,0,0,0.12);">
+            <span style="font-size: 16px;">
+              ${config.emoji}
             </span>
           </div>
         </div>
@@ -90,52 +90,64 @@ export const MapView: React.FC<MapViewProps> = ({
 
       const customIcon = L.divIcon({
         html: markerHtml,
-        className: 'custom-weather-pin',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-        popupAnchor: [0, -16]
+        className: 'custom-weather-pin-container',
+        iconSize: [38, 38],
+        iconAnchor: [19, 19],
+        popupAnchor: [0, -19]
       });
 
       const marker = L.marker([event.latitude, event.longitude], { icon: customIcon });
 
+      // Click Marker -> Center Map, Select Event, and Shift UI Weather Mood!
+      marker.on('click', () => {
+        onSelectEvent(event);
+        if (onMoodChange) {
+          onMoodChange(event.category);
+        }
+      });
+
+      // Build popup content
       const popupDiv = document.createElement('div');
-      popupDiv.className = 'p-1 text-slate-200 text-xs font-sans';
-      popupDiv.style.minWidth = '230px';
-      popupDiv.style.maxWidth = '280px';
+      popupDiv.className = 'p-1.5 font-sans text-slate-800';
+      popupDiv.style.minWidth = '240px';
+      popupDiv.style.maxWidth = '290px';
 
       popupDiv.innerHTML = `
-        <div class="flex items-center justify-between pb-1.5 border-b border-slate-800">
-          <span class="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.2 rounded" style="background: rgba(255,255,255,0.06); color: ${config.color}; border: 1px solid rgba(255,255,255,0.1);">
-            ${config.label}
+        <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+          <span class="text-xs font-bold px-2 py-0.5 rounded-lg flex items-center space-x-1" style="background: ${config.bgHex}; color: ${config.color}; border: 1px solid ${config.color}30;">
+            <span>${config.emoji}</span>
+            <span>${config.label}</span>
           </span>
-          <span class="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded ${
-            event.verificationStatus === 'verified' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' :
-            event.verificationStatus === 'flagged' ? 'bg-rose-950 text-rose-400 border border-rose-800' :
-            event.verificationStatus === 'duplicate' ? 'bg-purple-950 text-purple-400 border border-purple-800' :
-            'bg-amber-950 text-amber-400 border border-amber-800'
+          <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+            event.verificationStatus === 'verified' ? 'bg-emerald-100 text-emerald-800' :
+            event.verificationStatus === 'flagged' ? 'bg-rose-100 text-rose-800' :
+            event.verificationStatus === 'duplicate' ? 'bg-purple-100 text-purple-800' :
+            'bg-amber-100 text-amber-800'
           }">
             ${event.verificationStatus}
           </span>
         </div>
 
         <div class="mt-2">
-          <h4 class="text-xs font-semibold text-white leading-tight">${event.title}</h4>
-          <p class="text-[11px] text-slate-400 mt-1 line-clamp-2">${event.description}</p>
+          <h4 class="text-xs font-bold text-slate-900 leading-snug">${event.title}</h4>
+          <p class="text-[11px] text-slate-600 mt-1 line-clamp-2">${event.description}</p>
         </div>
 
         ${event.mediaUrl ? `
-          <div class="mt-2 rounded-lg overflow-hidden border border-slate-800 h-24 w-full">
+          <div class="mt-2 rounded-xl overflow-hidden border border-slate-200 h-28 w-full">
             <img src="${event.mediaUrl}" alt="${event.category}" class="w-full h-full object-cover" />
           </div>
         ` : ''}
 
-        <div class="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400">
-          <span>📍 <strong class="text-slate-200">${event.city}, ${event.state}</strong></span>
-          <span class="font-mono text-slate-400 uppercase">${event.source}</span>
+        <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+          <span>📍 <strong>${event.city}, ${event.state}</strong></span>
+          <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+            ${event.source}
+          </span>
         </div>
 
-        <button id="btn-view-intel-${event.id}" class="mt-2.5 w-full py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-medium transition-colors flex items-center justify-center cursor-pointer">
-          <span>View Incident Intel</span>
+        <button id="btn-view-intel-${event.id}" class="mt-2.5 w-full py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center cursor-pointer">
+          <span>View Incident Details</span>
         </button>
       `;
 
@@ -149,8 +161,9 @@ export const MapView: React.FC<MapViewProps> = ({
 
       marker.addTo(markersGroupRef.current!);
     });
-  }, [events, pulseEnabled, selectedEvent, onSelectEvent]);
+  }, [events, pulseEnabled, selectedEvent, onSelectEvent, onMoodChange]);
 
+  // Center on selected event
   useEffect(() => {
     if (!mapInstanceRef.current || !selectedEvent) return;
     if (!isNaN(selectedEvent.latitude) && !isNaN(selectedEvent.longitude)) {
@@ -187,83 +200,63 @@ export const MapView: React.FC<MapViewProps> = ({
   };
 
   return (
-    <div className="relative w-full h-[540px] rounded-xl overflow-hidden matte-card border border-slate-800 shadow-md">
+    <div className="relative w-full h-[560px] rounded-3xl overflow-hidden glass-card shadow-lg border border-white/80">
       
       <div ref={mapContainerRef} className="w-full h-full z-0" />
 
-      {/* Top Left Badge */}
-      <div className="absolute top-3.5 left-3.5 z-10 flex flex-col space-y-2">
-        <div className="bg-slate-900/90 border border-slate-800 px-3 py-1 rounded-md text-xs font-medium text-slate-300 flex items-center space-x-2 shadow-sm">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-          <span>Synoptic Radar View</span>
-          <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-1.5 py-0.2 rounded">
-            {events.length} Pins
+      {/* Top Left Floating Pill */}
+      <div className="absolute top-4 left-4 z-10 flex flex-col space-y-2">
+        <div className="bg-white/90 backdrop-blur-md px-3.5 py-1.5 rounded-2xl text-xs font-bold text-slate-800 flex items-center space-x-2 border border-slate-200/80 shadow-md">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Interactive Weather Map</span>
+          <span className="text-[11px] font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
+            {events.length} Events
           </span>
         </div>
       </div>
 
-      {/* Bottom Right Controls */}
-      <div className="absolute bottom-3.5 right-3.5 z-10 flex items-center space-x-2">
+      {/* Bottom Right Floating Action Controls */}
+      <div className="absolute bottom-4 right-4 z-10 flex items-center space-x-2">
         <button
           onClick={() => setPulseEnabled(!pulseEnabled)}
-          className={`p-2 rounded-lg text-xs border transition-colors ${
+          className={`p-2.5 rounded-2xl text-xs font-semibold backdrop-blur-md border transition-all shadow-md ${
             pulseEnabled
-              ? 'bg-slate-800 text-sky-300 border-slate-700'
-              : 'bg-slate-900 text-slate-400 border-slate-800'
+              ? 'bg-sky-600 text-white border-sky-500'
+              : 'bg-white/90 text-slate-700 border-slate-200'
           }`}
-          title="Toggle Pulse Animations"
+          title="Toggle Pulse Waves"
         >
-          <Radio className="w-3.5 h-3.5" />
+          <Radio className="w-4 h-4" />
         </button>
 
         <button
           onClick={handleLocateMe}
-          className="p-2 rounded-lg bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800 hover:border-slate-700 transition-colors shadow-sm"
+          className="p-2.5 rounded-2xl bg-white/90 backdrop-blur-md text-slate-700 hover:text-sky-600 border border-slate-200 shadow-md transition-all cursor-pointer"
           title="Locate My Position"
         >
-          <Crosshair className="w-3.5 h-3.5" />
+          <Crosshair className="w-4 h-4" />
         </button>
 
         <button
           onClick={handleRecenter}
-          className="flex items-center space-x-1 px-3 py-2 rounded-lg bg-slate-900 text-slate-400 hover:text-slate-200 text-xs font-medium border border-slate-800 hover:border-slate-700 transition-colors shadow-sm"
-          title="Reset Zoom"
+          className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-2xl bg-white/90 backdrop-blur-md text-slate-800 hover:text-sky-600 text-xs font-bold border border-slate-200 shadow-md transition-all cursor-pointer"
+          title="Reset Zoom to India"
         >
-          <Maximize2 className="w-3 h-3" />
+          <Maximize2 className="w-3.5 h-3.5" />
           <span>India View</span>
         </button>
       </div>
 
-      {/* Map Legend */}
-      <div className="absolute bottom-3.5 left-3.5 z-10 hidden sm:flex items-center space-x-3 bg-slate-900/90 px-3 py-1.5 rounded-lg border border-slate-800 text-[10px]">
-        <div className="flex items-center space-x-1">
-          <span className="w-2 h-2 rounded-full bg-sky-400"></span>
-          <span className="text-slate-300">Rain</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <span className="w-2 h-2 rounded-full bg-purple-400"></span>
-          <span className="text-slate-300">Storm</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-          <span className="text-slate-300">Flood</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <span className="w-2 h-2 rounded-full bg-orange-400"></span>
-          <span className="text-slate-300">Heat</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <span className="w-2 h-2 rounded-full bg-slate-400"></span>
-          <span className="text-slate-300">Fog</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-          <span className="text-slate-300">Dust</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <span className="w-2 h-2 rounded-full bg-teal-400"></span>
-          <span className="text-slate-300">Wind</span>
-        </div>
+      {/* Map Legend (Bottom Left) */}
+      <div className="absolute bottom-4 left-4 z-10 hidden sm:flex items-center space-x-3 bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl border border-slate-200 shadow-md text-xs font-medium text-slate-700">
+        <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Tap pin to change mood:</span>
+        <div className="flex items-center space-x-1"><span>🌧️</span><span>Rain</span></div>
+        <div className="flex items-center space-x-1"><span>⚡</span><span>Storm</span></div>
+        <div className="flex items-center space-x-1"><span>🌊</span><span>Flood</span></div>
+        <div className="flex items-center space-x-1"><span>🔥</span><span>Heat</span></div>
+        <div className="flex items-center space-x-1"><span>🌫️</span><span>Fog</span></div>
+        <div className="flex items-center space-x-1"><span>🌪️</span><span>Dust</span></div>
+        <div className="flex items-center space-x-1"><span>💨</span><span>Wind</span></div>
       </div>
 
     </div>

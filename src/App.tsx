@@ -1,41 +1,32 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { LiveTicker } from './components/LiveTicker';
+import { WeatherMoodBar } from './components/WeatherMoodBar';
 import { StatsOverview } from './components/StatsOverview';
 import { FilterBar } from './components/FilterBar';
 import { MapView } from './components/MapView';
 import { LiveFeedList } from './components/LiveFeedList';
+import { SimulationControls } from './components/SimulationControls';
 import { AnalyticsCharts } from './components/AnalyticsCharts';
-import { CitizenReportModal } from './components/CitizenReportModal';
 import { AdminPanel } from './components/AdminPanel';
+import { MultiSourceFeedsView } from './components/MultiSourceFeedsView';
+import { CitizenReportModal } from './components/CitizenReportModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { EventDetailModal } from './components/EventDetailModal';
-import { SimulationControls } from './components/SimulationControls';
-import { MultiSourceFeedsView } from './components/MultiSourceFeedsView';
-import { WeatherEvent, FilterState } from './types/weather';
+import { WeatherAtmosphere } from './components/WeatherAtmosphere';
+
+import { WeatherEvent, FilterState, WeatherMood } from './types/weather';
+import { MOOD_THEMES } from './data/initialEvents';
 import { getStoredEvents, getAdminAuthState } from './services/storage';
-import { generateSimulatedTweet, fetchLiveCityWeather } from './services/weatherApi';
-import { addEventWithProcessing } from './services/storage';
+import { fetchLiveCityWeather } from './services/weatherApi';
 import { MAJOR_INDIAN_CITIES } from './data/initialEvents';
-import { Bell, CheckCircle2, ShieldAlert, Sparkles, X } from 'lucide-react';
+import { addEventWithProcessing } from './services/storage';
 
-export function App() {
+export const App: React.FC = () => {
   const [events, setEvents] = useState<WeatherEvent[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState<WeatherEvent | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'admin' | 'feeds'>('dashboard');
+  const [activeMood, setActiveMood] = useState<WeatherMood>('default');
   
-  // Modals
-  const [isCitizenModalOpen, setIsCitizenModalOpen] = useState(false);
-  const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  
-  // Admin Auth
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-
-  // Live Toast Notification
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // Filter State
   const [filter, setFilter] = useState<FilterState>({
     searchQuery: '',
     categories: [],
@@ -47,114 +38,142 @@ export function App() {
     severityLevels: []
   });
 
+  const [selectedEvent, setSelectedEvent] = useState<WeatherEvent | null>(null);
+  const [inspectedEvent, setInspectedEvent] = useState<WeatherEvent | null>(null);
+  
+  const [isCitizenModalOpen, setIsCitizenModalOpen] = useState(false);
+  const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
   // Initialize data and listeners
   useEffect(() => {
-    setEvents(getStoredEvents());
+    const loaded = getStoredEvents();
+    setEvents(loaded);
     setIsAdminAuthenticated(getAdminAuthState());
 
-    const handleStorageUpdate = (e: any) => {
+    const handleCustomEvents = (e: any) => {
       if (e.detail) {
         setEvents(e.detail);
       }
     };
 
-    window.addEventListener('blure_events_updated', handleStorageUpdate);
-    return () => window.removeEventListener('blure_events_updated', handleStorageUpdate);
+    window.addEventListener('blure_events_updated', handleCustomEvents);
+    return () => window.removeEventListener('blure_events_updated', handleCustomEvents);
   }, []);
 
-  // Filtered Events
-  const filteredEvents = useMemo(() => {
-    return events.filter(event => {
-      // 1. Search Query
-      if (filter.searchQuery.trim()) {
-        const q = filter.searchQuery.toLowerCase();
-        const matches =
-          event.title.toLowerCase().includes(q) ||
-          event.description.toLowerCase().includes(q) ||
-          event.city.toLowerCase().includes(q) ||
-          event.state.toLowerCase().includes(q) ||
-          event.sourceAuthor.toLowerCase().includes(q) ||
-          (event.hashtags && event.hashtags.some(h => h.toLowerCase().includes(q)));
-        if (!matches) return false;
+  // Periodic automatic sync with Open-Meteo for live telemetry
+  useEffect(() => {
+    const syncRandomCity = async () => {
+      try {
+        const city = MAJOR_INDIAN_CITIES[Math.floor(Math.random() * MAJOR_INDIAN_CITIES.length)];
+        const liveEvent = await fetchLiveCityWeather(city);
+        if (liveEvent) {
+          addEventWithProcessing(liveEvent);
+        }
+      } catch (e) {
+        console.warn('Initial API sync skipped:', e);
       }
+    };
 
-      // 2. Event Category Filter
-      if (filter.categories.length > 0) {
-        if (!filter.categories.includes(event.category)) return false;
-      }
+    syncRandomCity();
+    const interval = setInterval(syncRandomCity, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
-      // 3. Source Filter
-      if (filter.sources.length > 0) {
-        if (!filter.sources.includes(event.source)) return false;
-      }
-
-      // 4. Verification Status Filter
-      if (filter.verificationStatuses.length > 0) {
-        if (!filter.verificationStatuses.includes(event.verificationStatus)) return false;
-      }
-
-      // 5. State Filter
-      if (filter.stateFilter !== 'All States') {
-        if (event.state !== filter.stateFilter) return false;
-      }
-
-      // 6. Date Range Filter
-      if (filter.dateRange !== 'all') {
-        const eventTime = new Date(event.timestamp).getTime();
-        const now = new Date().getTime();
-        const diffHours = (now - eventTime) / (1000 * 60 * 60);
-
-        if (filter.dateRange === 'today' && diffHours > 24) return false;
-        if (filter.dateRange === '24h' && diffHours > 24) return false;
-        if (filter.dateRange === '7d' && diffHours > 168) return false;
-      }
-
-      return true;
-    });
-  }, [events, filter]);
-
-  // Handle Event Selection
-  const handleSelectEvent = (event: WeatherEvent) => {
-    setSelectedEvent(event);
-  };
-
-  const handleOpenDetailModal = (event: WeatherEvent) => {
-    setSelectedEvent(event);
-    setIsDetailModalOpen(true);
-  };
-
-  // Trigger Toast Notification
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(prev => (prev === msg ? null : prev));
-    }, 5000);
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Handlers for Live Simulation Toolbar
-  const handleSimulationNewEvent = (newEvent: WeatherEvent, msg: string) => {
-    showToast(msg);
-  };
-
-  const handleTriggerApiSync = async () => {
-    const city = MAJOR_INDIAN_CITIES[Math.floor(Math.random() * MAJOR_INDIAN_CITIES.length)];
-    const data = await fetchLiveCityWeather(city);
-    if (data) {
-      addEventWithProcessing(data);
-      showToast(`Fetched live synoptic telemetry for ${city.name}`);
+  const handleNewEvent = (newEvent: WeatherEvent, msg?: string) => {
+    setEvents(getStoredEvents());
+    if (msg) {
+      showToast(msg);
     }
   };
 
-  const handleTriggerTweetSync = () => {
-    const tweet = generateSimulatedTweet();
-    addEventWithProcessing(tweet);
-    showToast(`Ingested new Twitter #IMD post: ${tweet.city}`);
+  const handleSelectEvent = (event: WeatherEvent) => {
+    setSelectedEvent(event);
+    setActiveMood(event.category);
   };
 
+  // Filter application
+  const filteredEvents = events.filter(e => {
+    if (filter.searchQuery) {
+      const q = filter.searchQuery.toLowerCase();
+      const match =
+        e.title.toLowerCase().includes(q) ||
+        e.description.toLowerCase().includes(q) ||
+        e.city.toLowerCase().includes(q) ||
+        e.state.toLowerCase().includes(q) ||
+        e.sourceAuthor.toLowerCase().includes(q) ||
+        (e.hashtags && e.hashtags.some(h => h.toLowerCase().includes(q)));
+      if (!match) return false;
+    }
+
+    if (filter.categories.length > 0 && !filter.categories.includes(e.category)) {
+      return false;
+    }
+
+    if (filter.sources.length > 0 && !filter.sources.includes(e.source)) {
+      return false;
+    }
+
+    if (filter.verificationStatuses.length > 0 && !filter.verificationStatuses.includes(e.verificationStatus)) {
+      return false;
+    }
+
+    if (filter.stateFilter !== 'All States' && e.state !== filter.stateFilter) {
+      return false;
+    }
+
+    if (filter.dateRange !== 'all') {
+      const eventTime = new Date(e.timestamp).getTime();
+      const now = Date.now();
+      if (filter.dateRange === '24h' && now - eventTime > 24 * 60 * 60 * 1000) return false;
+      if (filter.dateRange === '7d' && now - eventTime > 7 * 24 * 60 * 60 * 1000) return false;
+      if (filter.dateRange === 'today') {
+        const todayStr = new Date().toDateString();
+        const eventDateStr = new Date(e.timestamp).toDateString();
+        if (todayStr !== eventDateStr) return false;
+      }
+    }
+
+    return true;
+  });
+
+  const currentTheme = MOOD_THEMES[activeMood] || MOOD_THEMES.default;
+
   return (
-    <div className="min-h-screen flex flex-col bg-navy-950 text-slate-100 font-sans selection:bg-cyan-400 selection:text-navy-950">
+    <div className={`min-h-screen bg-gradient-to-br ${currentTheme.bgGradient} transition-colors duration-700 font-sans text-slate-900 selection:bg-sky-500 selection:text-white relative`}>
       
-      {/* Navigation Bar */}
+      {/* Dynamic Ambient Atmosphere Light Glow */}
+      <div 
+        className="fixed inset-0 pointer-events-none transition-opacity duration-1000 z-0"
+        style={{
+          background: activeMood === 'rainfall' 
+            ? 'radial-gradient(circle at 50% 10%, rgba(2, 132, 199, 0.12) 0%, transparent 70%)'
+            : activeMood === 'thunderstorm'
+            ? 'radial-gradient(circle at 50% 10%, rgba(124, 58, 237, 0.15) 0%, transparent 70%)'
+            : activeMood === 'heatwave'
+            ? 'radial-gradient(circle at 50% 10%, rgba(234, 88, 12, 0.15) 0%, transparent 70%)'
+            : activeMood === 'flooding'
+            ? 'radial-gradient(circle at 50% 10%, rgba(3, 105, 161, 0.15) 0%, transparent 70%)'
+            : activeMood === 'fog'
+            ? 'radial-gradient(circle at 50% 10%, rgba(100, 116, 139, 0.15) 0%, transparent 70%)'
+            : activeMood === 'dust storm'
+            ? 'radial-gradient(circle at 50% 10%, rgba(202, 138, 4, 0.15) 0%, transparent 70%)'
+            : activeMood === 'strong wind'
+            ? 'radial-gradient(circle at 50% 10%, rgba(13, 148, 136, 0.15) 0%, transparent 70%)'
+            : 'radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.1) 0%, transparent 60%)'
+        }}
+      />
+
+      {/* Dynamic Animated Atmospheric Weather Canvas */}
+      <WeatherAtmosphere mood={activeMood} />
+
+      {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -162,45 +181,72 @@ export function App() {
         onOpenAdminLoginModal={() => setIsAdminLoginModalOpen(true)}
         isAdminAuthenticated={isAdminAuthenticated}
         setIsAdminAuthenticated={setIsAdminAuthenticated}
+        activeMood={activeMood}
+        setActiveMood={setActiveMood}
         totalEventsCount={events.length}
       />
 
-      {/* Live Breaking Alert Marquee Ticker */}
-      <LiveTicker
-        events={events}
-        onSelectEvent={handleOpenDetailModal}
+      {/* Breaking Ticker */}
+      <LiveTicker 
+        events={events} 
+        onSelectEvent={(e) => {
+          setSelectedEvent(e);
+          setInspectedEvent(e);
+          setActiveMood(e.category);
+        }} 
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {/* Main Container */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10">
         
-        {/* Simulation & Evaluation Toolbar (Always accessible at top) */}
-        <SimulationControls onNewEvent={handleSimulationNewEvent} />
+        {/* Dynamic Weather Mood Bar */}
+        <WeatherMoodBar
+          activeMood={activeMood}
+          onSelectMood={(mood) => {
+            setActiveMood(mood);
+            if (mood !== 'default') {
+              setFilter(prev => ({
+                ...prev,
+                categories: [mood]
+              }));
+            } else {
+              setFilter(prev => ({
+                ...prev,
+                categories: []
+              }));
+            }
+          }}
+        />
 
-        {/* Tab 1: Live Dashboard & Map View */}
+        {/* View 1: Main Dashboard (Interactive Map + Live Feed) */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
             
-            {/* Top 4 KPI Metrics */}
+            {/* KPI Stats Overview */}
             <StatsOverview events={events} />
 
-            {/* 5-Way Interactive Filter Suite */}
+            {/* Testbed Live Ingestion Toolbar */}
+            <SimulationControls onNewEvent={handleNewEvent} />
+
+            {/* Filter Bar with 7 Categories & Search */}
             <FilterBar
               filter={filter}
               setFilter={setFilter}
               totalMatches={filteredEvents.length}
+              onCategorySelected={(cat) => setActiveMood(cat)}
             />
 
-            {/* Map & Live Stream Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Map & Live Feed Split View */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               
-              {/* Interactive Leaflet Dark Map */}
+              {/* Interactive CartoDB Leaflet Map */}
               <div className="lg:col-span-8">
                 <MapView
                   events={filteredEvents}
                   selectedEvent={selectedEvent}
                   onSelectEvent={handleSelectEvent}
                   onOpenReportModal={() => setIsCitizenModalOpen(true)}
+                  onMoodChange={(mood) => setActiveMood(mood)}
                 />
               </div>
 
@@ -210,7 +256,8 @@ export function App() {
                   events={filteredEvents}
                   selectedEvent={selectedEvent}
                   onSelectEvent={handleSelectEvent}
-                  onOpenDetails={handleOpenDetailModal}
+                  onOpenDetails={(e) => setInspectedEvent(e)}
+                  onMoodChange={(mood) => setActiveMood(mood)}
                 />
               </div>
 
@@ -219,12 +266,12 @@ export function App() {
           </div>
         )}
 
-        {/* Tab 2: Analytics & Trends */}
+        {/* View 2: Analytics & Trends */}
         {activeTab === 'analytics' && (
           <AnalyticsCharts events={events} />
         )}
 
-        {/* Tab 3: Admin Operational Verification */}
+        {/* View 3: Admin Moderation Console */}
         {activeTab === 'admin' && (
           <AdminPanel
             events={events}
@@ -232,83 +279,94 @@ export function App() {
             isAdminAuthenticated={isAdminAuthenticated}
             setIsAdminAuthenticated={setIsAdminAuthenticated}
             onOpenLoginModal={() => setIsAdminLoginModalOpen(true)}
-            onInspectEvent={handleOpenDetailModal}
+            onInspectEvent={(e) => setInspectedEvent(e)}
           />
         )}
 
-        {/* Tab 4: Multi-Source Ingestion Pipelines */}
+        {/* View 4: Multi-Source Feeds Pipeline */}
         {activeTab === 'feeds' && (
           <MultiSourceFeedsView
             events={events}
-            onTriggerApiFetch={handleTriggerApiSync}
-            onTriggerTweet={handleTriggerTweetSync}
+            onTriggerTweet={() => {
+              const res = addEventWithProcessing({
+                source: 'twitter',
+                sourceAuthor: 'Twitter Stream Poller',
+                timestamp: new Date().toISOString(),
+                city: 'Delhi',
+                state: 'Delhi',
+                latitude: 28.6139,
+                longitude: 77.2090,
+                category: 'rainfall',
+                severity: 'moderate',
+                title: 'Showers reported near Connaught Place',
+                description: 'Precipitation active across Central Delhi. Road traffic moving slow.',
+                rawText: 'Raining in CP! #DelhiRains #IMD'
+              });
+              handleNewEvent(res.event, 'New Twitter Ingestion Logged');
+            }}
+            onTriggerApiFetch={async () => {
+              const randomCity = MAJOR_INDIAN_CITIES[Math.floor(Math.random() * MAJOR_INDIAN_CITIES.length)];
+              const liveData = await fetchLiveCityWeather(randomCity);
+              if (liveData) {
+                const res = addEventWithProcessing(liveData);
+                handleNewEvent(res.event, `Open-Meteo Synop synced for ${randomCity.name}`);
+              }
+            }}
           />
         )}
 
       </main>
 
       {/* Footer */}
-      <footer className="w-full border-t border-navy-800/80 bg-navy-950/90 py-6 mt-12 text-center text-xs text-slate-400">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <footer className="w-full bg-white/70 backdrop-blur-md border-t border-slate-200/80 py-6 mt-12 text-center text-xs text-slate-500 font-medium">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center space-x-2">
-            <span className="font-extrabold text-white tracking-wider">CLOUD NET</span>
-            <span>• National Weather Event Aggregation & AI Verification Platform</span>
+            <span className="font-bold text-slate-900">CloudNet</span>
+            <span>•</span>
+            <span>National Weather Observation & AI Verification Platform</span>
           </div>
-          <div className="flex items-center space-x-4 font-mono text-[11px] text-slate-400">
-            <span>IMD Open Telemetry</span>
-            <span>•</span>
-            <span>Open-Meteo Integration</span>
-            <span>•</span>
-            <span className="text-cyan-400">Vercel Ready</span>
+          <div>
+            Data Sources: Open-Meteo API • Twitter / X Stream #IMD • Citizen Crowdsourcing
           </div>
         </div>
       </footer>
 
-      {/* Modals & Dialogs */}
+      {/* Toast Notification Banner */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center space-x-2 text-xs font-semibold animate-bounce border border-slate-800">
+          <span className="w-2 h-2 rounded-full bg-sky-400"></span>
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Citizen Report Modal */}
       <CitizenReportModal
         isOpen={isCitizenModalOpen}
         onClose={() => setIsCitizenModalOpen(false)}
         onReportSubmitted={(newEvent) => {
-          showToast(`Report logged! AI Confidence: ${newEvent.confidenceScore}% (${newEvent.verificationStatus.toUpperCase()})`);
-          setSelectedEvent(newEvent);
+          handleNewEvent(newEvent, 'Citizen Report submitted and verified by AI.');
         }}
+        onMoodChange={(mood) => setActiveMood(mood)}
       />
 
+      {/* Admin Login Modal */}
       <AdminLoginModal
         isOpen={isAdminLoginModalOpen}
         onClose={() => setIsAdminLoginModalOpen(false)}
         onLoginSuccess={() => {
           setIsAdminAuthenticated(true);
-          setActiveTab('admin');
-          showToast('Admin officer authenticated successfully.');
+          showToast('Officer authentication successful.');
         }}
       />
 
+      {/* Event Details Drawer Modal */}
       <EventDetailModal
-        event={selectedEvent}
-        onClose={() => setIsDetailModalOpen(false)}
-        onSelectEventById={(id) => {
-          const match = events.find(e => e.id === id);
-          if (match) setSelectedEvent(match);
-        }}
+        event={inspectedEvent}
+        onClose={() => setInspectedEvent(null)}
       />
-
-      {/* Real-time Ingestion Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center space-x-3 px-4 py-3 rounded-2xl bg-navy-900/95 border border-cyan-400/40 text-slate-100 shadow-2xl backdrop-blur-xl animate-bounce">
-          <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
-          <span className="text-xs font-medium">{toastMessage}</span>
-          <button
-            onClick={() => setToastMessage(null)}
-            className="p-1 rounded-lg text-slate-400 hover:text-white"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
 
     </div>
   );
-}
+};
 
 export default App;

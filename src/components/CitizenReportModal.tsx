@@ -7,10 +7,11 @@ import {
   CheckCircle2, 
   Send, 
   CloudRain,
-  ShieldCheck
+  ShieldCheck,
+  Sparkles
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { EventCategory, SeverityLevel, WeatherEvent } from '../types/weather';
+import { EventCategory, SeverityLevel, WeatherEvent, WeatherMood } from '../types/weather';
 import { CATEGORY_CONFIG, INDIAN_STATES, MAJOR_INDIAN_CITIES } from '../data/initialEvents';
 import { addEventWithProcessing } from '../services/storage';
 
@@ -18,6 +19,7 @@ interface CitizenReportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onReportSubmitted: (newEvent: WeatherEvent) => void;
+  onMoodChange?: (mood: WeatherMood) => void;
 }
 
 const PRESET_DEMO_PHOTOS = [
@@ -30,7 +32,8 @@ const PRESET_DEMO_PHOTOS = [
 export const CitizenReportModal: React.FC<CitizenReportModalProps> = ({
   isOpen,
   onClose,
-  onReportSubmitted
+  onReportSubmitted,
+  onMoodChange
 }) => {
   const [authorName, setAuthorName] = useState('');
   const [category, setCategory] = useState<EventCategory>('rainfall');
@@ -118,7 +121,7 @@ export const CitizenReportModal: React.FC<CitizenReportModalProps> = ({
     e.preventDefault();
 
     if (!description.trim()) {
-      alert('Please enter a description of the weather event.');
+      alert('Please describe what you are observing.');
       return;
     }
 
@@ -143,10 +146,14 @@ export const CitizenReportModal: React.FC<CitizenReportModalProps> = ({
 
     setSubmissionResult(result);
     onReportSubmitted(result.event);
+    
+    if (onMoodChange) {
+      onMoodChange(category);
+    }
 
     confetti({
-      particleCount: 60,
-      spread: 60,
+      particleCount: 70,
+      spread: 70,
       origin: { y: 0.6 }
     });
   };
@@ -158,185 +165,171 @@ export const CitizenReportModal: React.FC<CitizenReportModalProps> = ({
     onClose();
   };
 
+  const categories: EventCategory[] = [
+    'rainfall',
+    'thunderstorm',
+    'flooding',
+    'heatwave',
+    'fog',
+    'dust storm',
+    'strong wind'
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-xl bg-[#0d162b] border border-slate-700 rounded-2xl shadow-xl overflow-hidden my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
+      <div className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 my-8">
         
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
+        <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
           <div className="flex items-center space-x-3">
-            <div className="p-2 rounded-lg bg-slate-800 text-sky-400 border border-slate-700">
+            <div className="p-2.5 rounded-2xl bg-sky-100 text-sky-700">
               <CloudRain className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white">
-                Submit Weather Observation
+              <h3 className="text-base font-bold text-slate-900">
+                Report Weather Incident
               </h3>
-              <p className="text-[11px] text-slate-400">
-                Direct citizen crowdsource pipeline to IMD
+              <p className="text-xs text-slate-500 font-medium">
+                Submit live crowdsourced observation to the IMD National Grid
               </p>
             </div>
           </div>
 
           <button
             onClick={handleResetModal}
-            className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white transition-colors"
+            className="p-2 rounded-xl bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Modal Content */}
+        {/* Content */}
         <div className="p-6">
           {submissionResult ? (
-            <div className="text-center py-4 space-y-4">
-              <div className="w-12 h-12 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="w-6 h-6" />
+            <div className="text-center py-6 space-y-4">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto shadow-sm">
+                <CheckCircle2 className="w-8 h-8" />
               </div>
 
               <div>
-                <h4 className="text-base font-semibold text-white">Observation Successfully Logged</h4>
-                <p className="text-xs font-mono text-slate-400 mt-0.5">
-                  ID: <strong>{submissionResult.event.id}</strong>
+                <h4 className="text-lg font-bold text-slate-900">Report Successfully Logged!</h4>
+                <p className="text-xs font-mono text-slate-500 mt-1">
+                  Incident Reference: <strong>{submissionResult.event.id}</strong>
                 </p>
               </div>
 
-              <div className={`p-3.5 rounded-xl border text-left text-xs ${
+              <div className={`p-4 rounded-2xl border text-left text-xs font-medium ${
                 submissionResult.isDuplicate
-                  ? 'bg-purple-950/40 border-purple-800 text-purple-200'
+                  ? 'bg-purple-50 border-purple-200 text-purple-900'
                   : submissionResult.isFlagged
-                  ? 'bg-rose-950/40 border-rose-800 text-rose-200'
-                  : 'bg-emerald-950/40 border-emerald-800 text-emerald-200'
+                  ? 'bg-rose-50 border-rose-200 text-rose-900'
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-900'
               }`}>
-                <div className="flex items-center space-x-1.5 font-semibold mb-1">
+                <div className="flex items-center space-x-2 font-bold mb-1">
                   <ShieldCheck className="w-4 h-4" />
-                  <span>AI Verdict: {submissionResult.event.verificationStatus.toUpperCase()}</span>
+                  <span>AI Verification Result: {submissionResult.event.verificationStatus.toUpperCase()}</span>
                 </div>
                 
                 {submissionResult.isDuplicate && (
-                  <p className="text-[11px] text-slate-300">
+                  <p className="text-slate-600">
                     Nearby event detected in {submissionResult.event.city}. Merged into active incident cluster.
                   </p>
                 )}
 
                 {submissionResult.isFlagged && (
-                  <p className="text-[11px] text-slate-300">
-                    Flagged: {submissionResult.flagReason}
+                  <p className="text-slate-600">
+                    {submissionResult.flagReason}
                   </p>
                 )}
 
                 {!submissionResult.isDuplicate && !submissionResult.isFlagged && (
-                  <p className="text-[11px] text-slate-300">
-                    Submitted clean. Queued for verification (Score: {submissionResult.event.confidenceScore}%).
+                  <p className="text-slate-600">
+                    Clean report accepted with an initial AI confidence rating of {submissionResult.event.confidenceScore}%.
                   </p>
                 )}
               </div>
 
-              <div className="pt-2 flex justify-center">
+              <div className="pt-3 flex justify-center">
                 <button
                   onClick={handleResetModal}
-                  className="px-5 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs transition-colors"
+                  className="px-6 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-md shadow-sky-600/20 transition-all cursor-pointer"
                 >
-                  Done & View Map
+                  View on Live Map
                 </button>
               </div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">
-                    Reporter Name (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Rahul V."
-                    value={authorName}
-                    onChange={(e) => setAuthorName(e.target.value)}
-                    className="w-full matte-input px-3 py-1.5 rounded-lg"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">
-                    Event Category <span className="text-rose-400">*</span>
-                  </label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value as EventCategory)}
-                    className="w-full matte-input px-3 py-1.5 rounded-lg appearance-none cursor-pointer"
-                  >
-                    {Object.values(CATEGORY_CONFIG).map(cat => (
-                      <option key={cat.id} value={cat.id} className="bg-slate-900 text-slate-100">
-                        {cat.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
+              {/* Step 1: Select Event Category */}
               <div>
-                <label className="block text-slate-300 font-medium mb-1.5">
-                  Severity Level
+                <label className="block text-slate-700 font-bold mb-1.5">
+                  1. What weather event are you seeing? <span className="text-rose-500">*</span>
                 </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {(['low', 'moderate', 'severe', 'extreme'] as SeverityLevel[]).map(lvl => (
-                    <button
-                      type="button"
-                      key={lvl}
-                      onClick={() => setSeverity(lvl)}
-                      className={`py-1.5 rounded-lg text-center font-medium capitalize text-xs transition-colors ${
-                        severity === lvl
-                          ? lvl === 'extreme' ? 'bg-rose-900 text-rose-200 border border-rose-700'
-                          : lvl === 'severe' ? 'bg-amber-900 text-amber-200 border border-amber-700'
-                          : 'bg-sky-500 text-slate-950 font-semibold'
-                          : 'bg-slate-900 text-slate-400 border border-slate-800 hover:bg-slate-800'
-                      }`}
-                    >
-                      {lvl}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {categories.map(catKey => {
+                    const config = CATEGORY_CONFIG[catKey];
+                    const isSelected = category === catKey;
+
+                    return (
+                      <button
+                        type="button"
+                        key={catKey}
+                        onClick={() => setCategory(catKey)}
+                        className={`p-2.5 rounded-xl border text-center font-bold text-xs transition-all cursor-pointer flex flex-col items-center justify-center space-y-1 ${
+                          isSelected
+                            ? 'bg-slate-900 text-white border-slate-900 shadow-sm scale-102'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span className="text-xl">{config.emoji}</span>
+                        <span className="text-[11px] truncate w-full">{config.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2.5">
+              {/* Step 2: Location with 1-Click GPS */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-300 font-medium flex items-center">
-                    <MapPin className="w-3.5 h-3.5 text-sky-400 mr-1" /> Location
+                  <span className="text-slate-800 font-bold flex items-center">
+                    <MapPin className="w-4 h-4 text-sky-600 mr-1" /> 2. Location
                   </span>
 
                   <button
                     type="button"
                     onClick={handleDetectGPS}
                     disabled={isLocating}
-                    className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 text-[11px] transition-colors cursor-pointer"
+                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-[11px] shadow-sm transition-all cursor-pointer"
                   >
-                    <Navigation className={`w-3 h-3 ${isLocating ? 'animate-spin' : ''}`} />
-                    <span>{isLocating ? 'Detecting...' : 'Auto GPS'}</span>
+                    <Navigation className={`w-3.5 h-3.5 ${isLocating ? 'animate-spin' : ''}`} />
+                    <span>{isLocating ? 'Detecting GPS...' : '1-Tap Auto GPS'}</span>
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
+                    <label className="block text-slate-500 text-[11px] font-semibold mb-1">City</label>
                     <input
                       type="text"
                       value={city}
                       onChange={(e) => handleCitySelect(e.target.value)}
-                      placeholder="City"
-                      className="w-full matte-input px-3 py-1.5 rounded-lg"
+                      placeholder="e.g. Mumbai"
+                      className="w-full glass-input px-3 py-2 rounded-xl text-xs font-semibold"
                       required
                     />
                   </div>
 
                   <div>
+                    <label className="block text-slate-500 text-[11px] font-semibold mb-1">State</label>
                     <select
                       value={state}
                       onChange={(e) => setState(e.target.value)}
-                      className="w-full matte-input px-3 py-1.5 rounded-lg appearance-none cursor-pointer"
+                      className="w-full glass-input px-3 py-2 rounded-xl text-xs appearance-none cursor-pointer font-semibold"
                     >
                       {INDIAN_STATES.filter(s => s !== 'All States').map(s => (
-                        <option key={s} value={s} className="bg-slate-900 text-slate-100">
+                        <option key={s} value={s}>
                           {s}
                         </option>
                       ))}
@@ -344,43 +337,45 @@ export const CitizenReportModal: React.FC<CitizenReportModalProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400">
-                  <div>Lat: <input type="number" step="0.0001" value={latitude} onChange={(e) => setLatitude(parseFloat(e.target.value))} className="w-full matte-input px-2 py-0.5 rounded font-mono mt-0.5" /></div>
-                  <div>Lng: <input type="number" step="0.0001" value={longitude} onChange={(e) => setLongitude(parseFloat(e.target.value))} className="w-full matte-input px-2 py-0.5 rounded font-mono mt-0.5" /></div>
-                </div>
+                {locationSuccess && (
+                  <p className="text-[11px] text-emerald-700 font-semibold flex items-center">
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Exact GPS coordinates captured: {latitude}, {longitude}
+                  </p>
+                )}
               </div>
 
+              {/* Step 3: Description & Severity */}
               <div>
-                <label className="block text-slate-300 font-medium mb-1">
-                  Observations <span className="text-rose-400">*</span>
+                <label className="block text-slate-700 font-bold mb-1">
+                  3. Description & Observations <span className="text-rose-500">*</span>
                 </label>
                 <textarea
                   rows={2}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe rain, flood depth, wind gusts, damage or conditions..."
-                  className="w-full matte-input px-3 py-1.5 rounded-lg text-xs resize-none"
+                  placeholder="Describe the intensity (e.g. 2 feet water on road, trees shaking, heavy thunder)..."
+                  className="w-full glass-input px-3.5 py-2 rounded-xl text-xs resize-none font-medium"
                   required
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="block text-slate-300 font-medium">
-                  Photo Evidence (Optional)
-                </label>
-                
-                <div className="flex items-center space-x-2">
-                  <span className="text-[10px] text-slate-500">Presets:</span>
-                  <div className="flex flex-wrap gap-1">
+              {/* Photo Evidence */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-700 font-bold">
+                    4. Photo Proof (Optional)
+                  </label>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-[10px] text-slate-400 font-medium">Quick Demo:</span>
                     {PRESET_DEMO_PHOTOS.map(p => (
                       <button
                         type="button"
                         key={p.label}
                         onClick={() => setMediaUrl(p.url)}
-                        className={`text-[10px] px-2 py-0.5 rounded border transition-colors ${
+                        className={`text-[10px] px-2 py-0.5 rounded-md border font-semibold transition-all ${
                           mediaUrl === p.url
-                            ? 'bg-slate-800 text-sky-300 border-sky-500'
-                            : 'bg-slate-900 text-slate-400 border-slate-800'
+                            ? 'bg-sky-600 text-white border-sky-600'
+                            : 'bg-slate-100 text-slate-700 border-slate-200'
                         }`}
                       >
                         {p.label}
@@ -390,26 +385,27 @@ export const CitizenReportModal: React.FC<CitizenReportModalProps> = ({
                 </div>
 
                 {mediaUrl && (
-                  <div className="relative rounded-lg overflow-hidden h-20 border border-slate-800 mt-1">
-                    <img src={mediaUrl} alt="Evidence" className="w-full h-full object-cover" />
+                  <div className="relative rounded-2xl overflow-hidden h-28 border border-slate-200 mt-1 shadow-sm">
+                    <img src={mediaUrl} alt="Preview" className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => setMediaUrl('')}
-                      className="absolute top-1 right-1 p-1 bg-slate-900/80 text-white rounded hover:bg-slate-900"
+                      className="absolute top-2 right-2 p-1 bg-slate-900/80 text-white rounded-lg hover:bg-slate-900"
                     >
-                      <X className="w-3 h-3" />
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 )}
               </div>
 
+              {/* Submit CTA */}
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
+                  className="w-full py-3 rounded-2xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold text-sm shadow-md shadow-sky-600/20 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center space-x-2 cursor-pointer"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Submit Observation</span>
+                  <Send className="w-4 h-4" />
+                  <span>Submit Weather Observation</span>
                 </button>
               </div>
 
