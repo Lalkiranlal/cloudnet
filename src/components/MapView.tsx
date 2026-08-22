@@ -6,8 +6,11 @@ import {
   Crosshair, 
   Maximize2, 
   Radio, 
+  Layers,
   Sparkles,
-  Info
+  CloudRain,
+  Flame,
+  Map as MapIcon
 } from 'lucide-react';
 
 interface MapViewProps {
@@ -27,9 +30,12 @@ export const MapView: React.FC<MapViewProps> = ({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersGroupRef = useRef<L.LayerGroup | null>(null);
+  const radarGroupRef = useRef<L.LayerGroup | null>(null);
+  
   const [pulseEnabled, setPulseEnabled] = useState<boolean>(true);
+  const [mapMode, setMapMode] = useState<'standard' | 'radar' | 'thermal'>('standard');
 
-  // Initialize Leaflet Map with Light CartoDB Voyager Tiles
+  // Initialize Leaflet Map
   useEffect(() => {
     if (!mapContainerRef.current) return;
     if (mapInstanceRef.current) return;
@@ -42,7 +48,7 @@ export const MapView: React.FC<MapViewProps> = ({
       zoomControl: false
     });
 
-    // Light CartoDB Voyager Basemap for clean, bright, friendly readability
+    // Light CartoDB Voyager Basemap
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://carto.com/">CARTO</a> | IMD Open Data',
       subdomains: 'abcd',
@@ -51,6 +57,7 @@ export const MapView: React.FC<MapViewProps> = ({
 
     L.control.zoom({ position: 'topright' }).addTo(map);
 
+    radarGroupRef.current = L.layerGroup().addTo(map);
     markersGroupRef.current = L.layerGroup().addTo(map);
     mapInstanceRef.current = map;
 
@@ -60,7 +67,45 @@ export const MapView: React.FC<MapViewProps> = ({
     };
   }, []);
 
-  // Update Markers when events or pulse state changes
+  // Update Radar / Thermal Layer Overlays
+  useEffect(() => {
+    if (!mapInstanceRef.current || !radarGroupRef.current) return;
+
+    radarGroupRef.current.clearLayers();
+
+    if (mapMode === 'radar') {
+      // Draw Doppler Precipitation Radar Zones
+      events.forEach(e => {
+        if (e.category === 'rainfall' || e.category === 'thunderstorm' || e.category === 'flooding') {
+          const circle = L.circle([e.latitude, e.longitude], {
+            color: '#0284c7',
+            fillColor: '#38bdf8',
+            fillOpacity: 0.25,
+            radius: 45000,
+            weight: 2,
+            dashArray: '4, 8'
+          });
+          circle.addTo(radarGroupRef.current!);
+        }
+      });
+    } else if (mapMode === 'thermal') {
+      // Draw Thermal Infrared Heat Zones
+      events.forEach(e => {
+        if (e.category === 'heatwave') {
+          const circle = L.circle([e.latitude, e.longitude], {
+            color: '#ea580c',
+            fillColor: '#fb923c',
+            fillOpacity: 0.3,
+            radius: 65000,
+            weight: 2
+          });
+          circle.addTo(radarGroupRef.current!);
+        }
+      });
+    }
+  }, [mapMode, events]);
+
+  // Update Markers
   useEffect(() => {
     if (!mapInstanceRef.current || !markersGroupRef.current) return;
 
@@ -75,13 +120,13 @@ export const MapView: React.FC<MapViewProps> = ({
 
       // Custom Clean Frosted HTML Marker Pin
       const markerHtml = `
-        <div class="relative flex items-center justify-center cursor-pointer group" style="width: 38px; height: 38px;">
+        <div class="relative flex items-center justify-center cursor-pointer group" style="width: 40px; height: 40px;">
           ${pulseEnabled && isSevere ? `
-            <div class="pulse-ring-light absolute rounded-full" style="width: 40px; height: 40px; background-color: ${config.color}; opacity: 0.35;"></div>
+            <div class="pulse-ring-light absolute rounded-full" style="width: 42px; height: 42px; background-color: ${config.color}; opacity: 0.35;"></div>
           ` : ''}
           <div class="custom-weather-pin relative z-10 flex items-center justify-center rounded-2xl shadow-md transition-transform ${isSelected ? 'scale-125 ring-4 ring-sky-400' : ''}" 
-               style="width: 32px; height: 32px; background: #ffffff; border: 2px solid ${config.color}; box-shadow: 0 4px 12px rgba(0,0,0,0.12);">
-            <span style="font-size: 16px;">
+               style="width: 34px; height: 34px; background: #ffffff; border: 2px solid ${config.color}; box-shadow: 0 4px 14px rgba(0,0,0,0.12);">
+            <span style="font-size: 17px;">
               ${config.emoji}
             </span>
           </div>
@@ -91,14 +136,13 @@ export const MapView: React.FC<MapViewProps> = ({
       const customIcon = L.divIcon({
         html: markerHtml,
         className: 'custom-weather-pin-container',
-        iconSize: [38, 38],
-        iconAnchor: [19, 19],
-        popupAnchor: [0, -19]
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
+        popupAnchor: [0, -20]
       });
 
       const marker = L.marker([event.latitude, event.longitude], { icon: customIcon });
 
-      // Click Marker -> Center Map, Select Event, and Shift UI Weather Mood!
       marker.on('click', () => {
         onSelectEvent(event);
         if (onMoodChange) {
@@ -106,11 +150,11 @@ export const MapView: React.FC<MapViewProps> = ({
         }
       });
 
-      // Build popup content
+      // Popup Content
       const popupDiv = document.createElement('div');
-      popupDiv.className = 'p-1.5 font-sans text-slate-800';
-      popupDiv.style.minWidth = '240px';
-      popupDiv.style.maxWidth = '290px';
+      popupDiv.className = 'p-1 font-sans text-slate-800';
+      popupDiv.style.minWidth = '250px';
+      popupDiv.style.maxWidth = '300px';
 
       popupDiv.innerHTML = `
         <div class="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -200,18 +244,57 @@ export const MapView: React.FC<MapViewProps> = ({
   };
 
   return (
-    <div className="relative w-full h-[560px] rounded-3xl overflow-hidden glass-card shadow-lg border border-white/80">
+    <div className="relative w-full h-[580px] rounded-3xl overflow-hidden glass-card shadow-xl border border-white/80">
       
       <div ref={mapContainerRef} className="w-full h-full z-0" />
 
-      {/* Top Left Floating Pill */}
+      {/* Top Left Floating Header with Layer Switcher */}
       <div className="absolute top-4 left-4 z-10 flex flex-col space-y-2">
         <div className="bg-white/90 backdrop-blur-md px-3.5 py-1.5 rounded-2xl text-xs font-bold text-slate-800 flex items-center space-x-2 border border-slate-200/80 shadow-md">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>Interactive Weather Map</span>
+          <span>IMD National Weather Map</span>
           <span className="text-[11px] font-mono text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
             {events.length} Events
           </span>
+        </div>
+
+        {/* Interactive Map Mode Layer Switcher */}
+        <div className="bg-white/90 backdrop-blur-md p-1 rounded-2xl flex items-center space-x-1 border border-slate-200/80 shadow-md text-xs">
+          <button
+            onClick={() => setMapMode('standard')}
+            className={`flex items-center space-x-1 px-2.5 py-1 rounded-xl font-bold transition-all cursor-pointer ${
+              mapMode === 'standard'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <MapIcon className="w-3 h-3" />
+            <span>Map</span>
+          </button>
+
+          <button
+            onClick={() => setMapMode('radar')}
+            className={`flex items-center space-x-1 px-2.5 py-1 rounded-xl font-bold transition-all cursor-pointer ${
+              mapMode === 'radar'
+                ? 'bg-sky-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <CloudRain className="w-3 h-3" />
+            <span>Doppler Radar</span>
+          </button>
+
+          <button
+            onClick={() => setMapMode('thermal')}
+            className={`flex items-center space-x-1 px-2.5 py-1 rounded-xl font-bold transition-all cursor-pointer ${
+              mapMode === 'thermal'
+                ? 'bg-orange-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Flame className="w-3 h-3" />
+            <span>Thermal IR</span>
+          </button>
         </div>
       </div>
 

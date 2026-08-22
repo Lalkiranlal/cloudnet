@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { LiveTicker } from './components/LiveTicker';
+import { CityGlanceBar } from './components/CityGlanceBar';
 import { WeatherMoodBar } from './components/WeatherMoodBar';
 import { StatsOverview } from './components/StatsOverview';
 import { FilterBar } from './components/FilterBar';
@@ -13,6 +14,7 @@ import { MultiSourceFeedsView } from './components/MultiSourceFeedsView';
 import { CitizenReportModal } from './components/CitizenReportModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { EventDetailModal } from './components/EventDetailModal';
+import { EmergencyHelplineModal } from './components/EmergencyHelplineModal';
 import { WeatherAtmosphere } from './components/WeatherAtmosphere';
 import { WeatherAIChatbot } from './components/WeatherAIChatbot';
 
@@ -44,6 +46,7 @@ export const App: React.FC = () => {
   
   const [isCitizenModalOpen, setIsCitizenModalOpen] = useState(false);
   const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
+  const [isHelplinesModalOpen, setIsHelplinesModalOpen] = useState(false);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -97,6 +100,35 @@ export const App: React.FC = () => {
   const handleSelectEvent = (event: WeatherEvent) => {
     setSelectedEvent(event);
     setActiveMood(event.category);
+  };
+
+  const handleFocusCity = (cityName: string) => {
+    const matched = events.find(e => e.city.toLowerCase() === cityName.toLowerCase());
+    if (matched) {
+      setSelectedEvent(matched);
+      setActiveMood(matched.category);
+    } else {
+      const cityData = MAJOR_INDIAN_CITIES.find(c => c.name.toLowerCase() === cityName.toLowerCase());
+      if (cityData) {
+        setSelectedEvent({
+          id: `temp-city-${cityName}`,
+          source: 'api',
+          sourceAuthor: 'IMD Observation',
+          timestamp: new Date().toISOString(),
+          city: cityData.name,
+          state: cityData.state,
+          latitude: cityData.lat,
+          longitude: cityData.lng,
+          category: 'rainfall',
+          severity: 'moderate',
+          title: `Weather Status for ${cityData.name}`,
+          description: `Observation center located in ${cityData.name}, ${cityData.state}.`,
+          verificationStatus: 'verified',
+          confidenceScore: 90
+        });
+      }
+    }
+    setActiveTab('dashboard');
   };
 
   // Filter application
@@ -180,6 +212,7 @@ export const App: React.FC = () => {
         setActiveTab={setActiveTab}
         onOpenCitizenModal={() => setIsCitizenModalOpen(true)}
         onOpenAdminLoginModal={() => setIsAdminLoginModalOpen(true)}
+        onOpenHelplinesModal={() => setIsHelplinesModalOpen(true)}
         isAdminAuthenticated={isAdminAuthenticated}
         setIsAdminAuthenticated={setIsAdminAuthenticated}
         activeMood={activeMood}
@@ -200,6 +233,13 @@ export const App: React.FC = () => {
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10">
         
+        {/* Quick Metro Glance Bar */}
+        <CityGlanceBar
+          events={events}
+          onSelectCity={handleFocusCity}
+          onMoodChange={(mood) => setActiveMood(mood)}
+        />
+
         {/* Dynamic Weather Mood Bar */}
         <WeatherMoodBar
           activeMood={activeMood}
@@ -360,6 +400,12 @@ export const App: React.FC = () => {
         }}
       />
 
+      {/* Emergency Helplines Modal */}
+      <EmergencyHelplineModal
+        isOpen={isHelplinesModalOpen}
+        onClose={() => setIsHelplinesModalOpen(false)}
+      />
+
       {/* Event Details Drawer Modal */}
       <EventDetailModal
         event={inspectedEvent}
@@ -375,14 +421,7 @@ export const App: React.FC = () => {
           setActiveMood(cat);
           setActiveTab('dashboard');
         }}
-        onFocusCity={(cityName: string) => {
-          const matched = events.find(e => e.city.toLowerCase() === cityName.toLowerCase());
-          if (matched) {
-            setSelectedEvent(matched);
-            setActiveMood(matched.category);
-            setActiveTab('dashboard');
-          }
-        }}
+        onFocusCity={handleFocusCity}
         onMoodChange={(mood) => setActiveMood(mood)}
       />
 

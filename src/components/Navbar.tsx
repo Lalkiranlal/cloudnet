@@ -6,11 +6,12 @@ import {
   PlusCircle, 
   Lock, 
   Unlock, 
-  ShieldCheck,
-  Radio,
-  RotateCcw,
-  Sparkles,
-  Layers
+  ShieldCheck, 
+  Radio, 
+  RotateCcw, 
+  Sparkles, 
+  PhoneCall,
+  ShieldAlert
 } from 'lucide-react';
 import { WeatherMood, MoodTheme } from '../types/weather';
 import { MOOD_THEMES } from '../data/initialEvents';
@@ -21,6 +22,7 @@ interface NavbarProps {
   setActiveTab: (tab: 'dashboard' | 'analytics' | 'admin' | 'feeds') => void;
   onOpenCitizenModal: () => void;
   onOpenAdminLoginModal: () => void;
+  onOpenHelplinesModal: () => void;
   isAdminAuthenticated: boolean;
   setIsAdminAuthenticated: (authed: boolean) => void;
   activeMood: WeatherMood;
@@ -33,6 +35,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   onOpenCitizenModal,
   onOpenAdminLoginModal,
+  onOpenHelplinesModal,
   isAdminAuthenticated,
   setIsAdminAuthenticated,
   activeMood,
@@ -72,7 +75,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full glass-nav transition-all duration-300 shadow-sm">
+    <header className="sticky top-0 z-40 w-full glass-nav transition-all duration-300 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-18 py-2">
           
@@ -94,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   CloudNet
                 </span>
                 <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-200">
-                  IMD Official
+                  IMD Grid
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-medium">
@@ -114,7 +117,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Map className="w-3.5 h-3.5" />
-              <span>Live Map & Feed</span>
+              <span>Live Map</span>
             </button>
 
             <button
@@ -126,7 +129,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <BarChart3 className="w-3.5 h-3.5" />
-              <span>Trends & Charts</span>
+              <span>Charts & Stats</span>
             </button>
 
             <button
@@ -158,7 +161,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </nav>
 
           {/* Right Action Area */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2.5">
             
             {/* Active Weather Mood Badge (Interactive) */}
             <div 
@@ -167,7 +170,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <span className="text-base">{currentMoodTheme.emoji}</span>
               <div className="flex flex-col">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">Weather Mood</span>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">Mood</span>
                 <span className="font-semibold">{currentMoodTheme.label}</span>
               </div>
               {activeMood !== 'default' && (
@@ -181,21 +184,23 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
 
-            {/* Quick IST Clock */}
-            <div className="hidden xl:flex flex-col text-right text-xs font-mono text-slate-500 px-2">
-              <span className="text-slate-800 font-semibold">{istTime || 'IST Live'}</span>
-              <span className="text-[10px] text-emerald-600 font-sans font-medium flex items-center justify-end">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse"></span> Live Sensors
-              </span>
-            </div>
+            {/* Emergency Helplines Button */}
+            <button
+              onClick={onOpenHelplinesModal}
+              className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 shadow-xs transition-all cursor-pointer"
+              title="Emergency Helplines & Disaster Guidelines"
+            >
+              <ShieldAlert className="w-4 h-4 text-rose-600" />
+              <span className="hidden sm:inline">SOS Helplines</span>
+            </button>
 
-            {/* Citizen Report Action Button (Prominent & Friendly) */}
+            {/* Citizen Report Action Button */}
             <button
               onClick={onOpenCitizenModal}
               className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold text-xs shadow-md shadow-sky-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
             >
               <PlusCircle className="w-4 h-4 stroke-[2.5]" />
-              <span>Report Weather</span>
+              <span>Report</span>
             </button>
 
             {/* Admin Toggle */}
@@ -227,7 +232,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               activeTab === 'dashboard' ? 'text-sky-700 bg-sky-100' : 'text-slate-600'
             }`}
           >
-            🗺️ Map & Feed
+            🗺️ Map
           </button>
           <button
             onClick={() => setActiveTab('analytics')}
@@ -252,6 +257,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             📡 Feeds
+          </button>
+          <button
+            onClick={onOpenHelplinesModal}
+            className="text-xs py-1.5 px-3 rounded-lg font-semibold text-rose-700 bg-rose-50"
+          >
+            🚨 SOS
           </button>
         </div>
 
