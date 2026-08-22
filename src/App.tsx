@@ -20,10 +20,9 @@ import { WeatherAIChatbot } from './components/WeatherAIChatbot';
 
 import { WeatherEvent, FilterState, WeatherMood, EventCategory } from './types/weather';
 import { MOOD_THEMES } from './data/initialEvents';
-import { getStoredEvents, getAdminAuthState } from './services/storage';
-import { fetchLiveCityWeather } from './services/weatherApi';
+import { getStoredEvents, getAdminAuthState, addEventWithProcessing, batchAddEvents } from './services/storage';
+import { fetchLiveCityWeather, fetchAllIndianCitiesLiveWeather } from './services/weatherApi';
 import { MAJOR_INDIAN_CITIES } from './data/initialEvents';
-import { addEventWithProcessing } from './services/storage';
 
 export const App: React.FC = () => {
   const [events, setEvents] = useState<WeatherEvent[]>([]);
@@ -50,7 +49,7 @@ export const App: React.FC = () => {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Initialize data and listeners
+  // Initialize data and listeners with 100% Real-World Live Data Sync
   useEffect(() => {
     const loaded = getStoredEvents();
     setEvents(loaded);
@@ -63,26 +62,29 @@ export const App: React.FC = () => {
     };
 
     window.addEventListener('blure_events_updated', handleCustomEvents);
-    return () => window.removeEventListener('blure_events_updated', handleCustomEvents);
-  }, []);
 
-  // Periodic automatic sync with Open-Meteo for live telemetry
-  useEffect(() => {
-    const syncRandomCity = async () => {
+    // Initial 100% Live Sync: Pull real-world telemetry from all Indian meteorological stations
+    const syncAllLiveWeather = async () => {
       try {
-        const city = MAJOR_INDIAN_CITIES[Math.floor(Math.random() * MAJOR_INDIAN_CITIES.length)];
-        const liveEvent = await fetchLiveCityWeather(city);
-        if (liveEvent) {
-          addEventWithProcessing(liveEvent);
+        const liveCitiesData = await fetchAllIndianCitiesLiveWeather();
+        if (liveCitiesData.length > 0) {
+          batchAddEvents(liveCitiesData);
+          showToast(`⚡ Live Sync Active: Connected to ${liveCitiesData.length} Indian Weather Stations`);
         }
       } catch (e) {
-        console.warn('Initial API sync skipped:', e);
+        console.warn('Live API auto-sync initial attempt:', e);
       }
     };
 
-    syncRandomCity();
-    const interval = setInterval(syncRandomCity, 60000);
-    return () => clearInterval(interval);
+    syncAllLiveWeather();
+
+    // Auto-poll live sensor telemetry every 45 seconds
+    const interval = setInterval(syncAllLiveWeather, 45000);
+
+    return () => {
+      window.removeEventListener('blure_events_updated', handleCustomEvents);
+      clearInterval(interval);
+    };
   }, []);
 
   const showToast = (msg: string) => {
@@ -286,6 +288,7 @@ export const App: React.FC = () => {
                   events={filteredEvents}
                   selectedEvent={selectedEvent}
                   onSelectEvent={handleSelectEvent}
+                  onOpenDetails={(e) => setInspectedEvent(e)}
                   onOpenReportModal={() => setIsCitizenModalOpen(true)}
                   onMoodChange={(mood) => setActiveMood(mood)}
                 />

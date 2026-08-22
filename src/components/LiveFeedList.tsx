@@ -88,7 +88,7 @@ export const LiveFeedList: React.FC<LiveFeedListProps> = ({
             <p className="text-xs text-slate-400 mt-1">Try selecting another category or state</p>
           </div>
         ) : (
-          events.map(event => {
+          events.slice(0, 60).map(event => {
             const config = CATEGORY_CONFIG[event.category] || CATEGORY_CONFIG.rainfall;
             const isSelected = selectedEvent?.id === event.id;
 

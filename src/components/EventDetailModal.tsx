@@ -1,12 +1,16 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   X, 
   MapPin, 
   Radio, 
   Users, 
   Copy, 
-  Gauge,
-  Sparkles
+  Gauge, 
+  Sparkles,
+  CloudRain,
+  TrendingUp,
+  Wind,
+  Calendar
 } from 'lucide-react';
 import { Twitter } from './icons/TwitterIcon';
 import { WeatherEvent } from '../types/weather';
@@ -18,22 +22,70 @@ interface EventDetailModalProps {
   onSelectEventById?: (id: string) => void;
 }
 
+interface HourlyForecastPoint {
+  time: string;
+  temp: number;
+  rainProb: number;
+  rainMm: number;
+  windSpeed: number;
+}
+
 export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   event,
   onClose
 }) => {
+  const [hourlyForecast, setHourlyForecast] = useState<HourlyForecastPoint[]>([]);
+  const [isLoadingForecast, setIsLoadingForecast] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!event) return;
+
+    const fetchLiveForecast = async () => {
+      setIsLoadingForecast(true);
+      try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${event.latitude}&longitude=${event.longitude}&hourly=temperature_2m,precipitation_probability,precipitation,wind_speed_10m&timezone=Asia%2FKolkata`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          const currentHourIdx = new Date().getHours();
+          const times = data.hourly.time.slice(currentHourIdx, currentHourIdx + 8);
+          const temps = data.hourly.temperature_2m.slice(currentHourIdx, currentHourIdx + 8);
+          const rainProbs = data.hourly.precipitation_probability.slice(currentHourIdx, currentHourIdx + 8);
+          const rainMms = data.hourly.precipitation.slice(currentHourIdx, currentHourIdx + 8);
+          const windSpeeds = data.hourly.wind_speed_10m.slice(currentHourIdx, currentHourIdx + 8);
+
+          const points: HourlyForecastPoint[] = times.map((t: string, idx: number) => ({
+            time: new Date(t).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+            temp: temps[idx],
+            rainProb: rainProbs[idx],
+            rainMm: rainMms[idx],
+            windSpeed: windSpeeds[idx]
+          }));
+
+          setHourlyForecast(points);
+        }
+      } catch (err) {
+        console.warn('Could not fetch live forecast for modal:', err);
+      } finally {
+        setIsLoadingForecast(false);
+      }
+    };
+
+    fetchLiveForecast();
+  }, [event]);
+
   if (!event) return null;
 
   const config = CATEGORY_CONFIG[event.category] || CATEGORY_CONFIG.rainfall;
 
   const copyCoords = () => {
     navigator.clipboard.writeText(`${event.latitude}, ${event.longitude}`);
-    alert('GPS coordinates copied!');
+    alert('GPS coordinates copied to clipboard!');
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
-      <div className="relative w-full max-w-xl bg-white border border-slate-100 rounded-3xl shadow-2xl overflow-hidden my-8">
+      <div className="relative w-full max-w-xl bg-white border border-slate-100 rounded-3xl shadow-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}
         <div 
@@ -69,55 +121,30 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl bg-white/80 text-slate-600 hover:text-slate-900 shadow-xs transition-colors"
+            className="p-2 rounded-xl bg-white text-slate-500 hover:text-slate-900 shadow-xs transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Content Body */}
-        <div className="p-6 space-y-4 text-xs">
+        {/* Content */}
+        <div className="p-6 space-y-5 text-xs max-h-[75vh] overflow-y-auto">
           
           <div>
             <h4 className="text-sm font-bold text-slate-900">{event.title}</h4>
-            <p className="text-xs text-slate-600 mt-1 leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-100 font-medium">
-              {event.description}
-            </p>
+            <p className="text-slate-600 mt-1 leading-relaxed">{event.description}</p>
           </div>
 
-          {event.mediaUrl && (
-            <div className="space-y-1.5">
-              <span className="text-slate-500 font-bold">Photo Evidence</span>
-              <div className="rounded-2xl overflow-hidden border border-slate-200 h-52 w-full relative shadow-sm">
-                <img src={event.mediaUrl} alt={event.title} className="w-full h-full object-cover" />
-                <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded-xl bg-slate-900/80 text-[11px] text-white font-mono shadow-sm">
-                  GPS: {event.latitude.toFixed(4)}, {event.longitude.toFixed(4)}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Key Metadata Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            
+          {/* Quick Metrics Grid */}
+          <div className="grid grid-cols-3 gap-3">
             <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
-              <span className="text-[10px] text-slate-400 uppercase font-bold">Timestamp</span>
-              <div className="font-mono text-slate-900 font-bold mt-0.5 text-xs">
-                {new Date(event.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-              </div>
-              <div className="text-[10px] text-slate-400 font-mono">
-                {new Date(event.timestamp).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
-              </div>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
-              <span className="text-[10px] text-slate-400 uppercase font-bold">Location</span>
-              <div className="font-mono text-slate-900 font-bold mt-0.5 text-xs truncate">
-                {event.latitude.toFixed(3)}, {event.longitude.toFixed(3)}
-              </div>
-              <button 
+              <span className="text-[10px] text-slate-400 uppercase font-bold">Coordinates</span>
+              <p className="font-mono text-slate-800 font-bold mt-0.5">
+                {event.latitude.toFixed(4)}°N, {event.longitude.toFixed(4)}°E
+              </p>
+              <button
                 onClick={copyCoords}
-                className="text-[10px] text-sky-600 font-semibold hover:underline flex items-center mt-0.5"
+                className="text-[10px] text-sky-600 font-semibold hover:underline flex items-center mt-0.5 cursor-pointer"
               >
                 <Copy className="w-2.5 h-2.5 mr-1" /> Copy GPS
               </button>
@@ -152,7 +179,40 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
                 Score: {event.confidenceScore}%
               </div>
             </div>
+          </div>
 
+          {/* Real-time Live Hourly Forecast Section (Pulled Live from Open-Meteo) */}
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-sky-50 to-indigo-50/60 border border-sky-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-900 flex items-center space-x-1.5">
+                <TrendingUp className="w-4 h-4 text-sky-600" />
+                <span>Live Next 8-Hour Synoptic Forecast</span>
+              </span>
+              <span className="text-[10px] font-mono text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                ECMWF / Open-Meteo Synop
+              </span>
+            </div>
+
+            {isLoadingForecast ? (
+              <div className="text-center py-4 text-slate-400 font-medium animate-pulse">
+                Querying live meteorological satellites...
+              </div>
+            ) : hourlyForecast.length > 0 ? (
+              <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+                {hourlyForecast.map((pt, idx) => (
+                  <div key={idx} className="p-2 bg-white/90 rounded-xl border border-sky-100 flex flex-col items-center text-center shadow-xs">
+                    <span className="text-[10px] text-slate-400 font-medium">{pt.time}</span>
+                    <span className="font-mono text-xs font-extrabold text-slate-900 my-0.5">{Math.round(pt.temp)}°C</span>
+                    <div className="flex items-center text-[10px] font-bold text-sky-600">
+                      <CloudRain className="w-2.5 h-2.5 mr-0.5" />
+                      <span>{pt.rainProb}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-500 text-[11px]">Forecast data unavailable for this location.</p>
+            )}
           </div>
 
           {/* Telemetry */}

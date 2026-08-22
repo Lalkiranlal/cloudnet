@@ -18,28 +18,30 @@ interface OpenMeteoResponse {
 }
 
 /**
- * Maps WMO weather code to IMD standard category and severity
+ * Maps real-world WMO weather codes and telemetry into IMD standard categories and severity
  */
 function mapWmoToCategory(
   code: number,
   tempC: number,
   windKmh: number,
   precipMm: number
-): { category: EventCategory; severity: SeverityLevel; description: string } {
-  // Extreme heat check
+): { category: EventCategory; severity: SeverityLevel; description: string; titlePrefix: string } {
+  // Extreme heat condition
   if (tempC >= 42) {
     return {
       category: 'heatwave',
       severity: tempC >= 45 ? 'extreme' : 'severe',
+      titlePrefix: 'Severe Heatwave Advisory',
       description: `Surface thermometer registering ${tempC.toFixed(1)}°C with dry westerly winds.`
     };
   }
 
-  // Strong wind check
-  if (windKmh >= 50) {
+  // Strong wind condition
+  if (windKmh >= 45) {
     return {
       category: 'strong wind',
-      severity: windKmh >= 70 ? 'extreme' : 'severe',
+      severity: windKmh >= 65 ? 'extreme' : 'severe',
+      titlePrefix: 'High Velocity Wind Squall',
       description: `High velocity surface winds gusting at ${windKmh.toFixed(1)} km/h.`
     };
   }
@@ -49,15 +51,17 @@ function mapWmoToCategory(
     return {
       category: 'thunderstorm',
       severity: 'severe',
+      titlePrefix: 'Active Thunderstorm & Lightning Alert',
       description: `Convective thunder activity with intense lightning bursts and squall fronts.`
     };
   }
 
-  // Fog codes: 45, 48
+  // Fog / mist codes: 45, 48
   if ([45, 48].includes(code)) {
     return {
       category: 'fog',
       severity: 'moderate',
+      titlePrefix: 'Dense Fog & Low Visibility Advisory',
       description: `Atmospheric fog reducing surface horizontal visibility.`
     };
   }
@@ -67,24 +71,37 @@ function mapWmoToCategory(
     return {
       category: 'flooding',
       severity: 'extreme',
+      titlePrefix: 'Urban Waterlogging & Deluge Alert',
       description: `Excessive localized deluge of ${precipMm.toFixed(1)}mm/hr triggering urban drainage surcharge.`
     };
   }
 
-  // Default rain / showers
+  // Rain / Showers
   if (precipMm > 0 || [51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) {
     return {
       category: 'rainfall',
       severity: precipMm > 15 ? 'severe' : 'moderate',
+      titlePrefix: 'Active Rainfall Spell',
       description: `Continuous precipitation spells measuring ${precipMm.toFixed(1)}mm.`
     };
   }
 
-  // Default fallback for calm conditions
+  // Desert dust conditions in Western Rajasthan
+  if (tempC >= 38 && windKmh >= 28) {
+    return {
+      category: 'dust storm',
+      severity: 'moderate',
+      titlePrefix: 'Dust Squall Activity',
+      description: `Gusting surface winds stirring airborne particulate dust over arid terrain.`
+    };
+  }
+
+  // Default atmospheric observation
   return {
     category: 'rainfall',
     severity: 'low',
-    description: `Localized meteorological sensor observation: Temp ${tempC.toFixed(1)}°C, Humidity ${precipMm}%.`
+    titlePrefix: 'Synoptic Observation',
+    description: `Meteorological surface station reading: Temp ${tempC.toFixed(1)}°C, Humidity ${precipMm}%.`
   };
 }
 
@@ -105,7 +122,7 @@ export async function fetchLiveCityWeather(
     const data: OpenMeteoResponse = await response.json();
     const curr = data.current;
 
-    const { category, severity, description } = mapWmoToCategory(
+    const { category, severity, description, titlePrefix } = mapWmoToCategory(
       curr.weather_code,
       curr.temperature_2m,
       curr.wind_gusts_10m || curr.wind_speed_10m,
@@ -113,9 +130,9 @@ export async function fetchLiveCityWeather(
     );
 
     const newEvent: WeatherEvent = {
-      id: `evt-api-live-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      id: `evt-live-${cityObj.name.toLowerCase()}-${Date.now().toString().slice(-4)}`,
       source: 'api',
-      sourceAuthor: `Open-Meteo Telemetry [${cityObj.name.toUpperCase()}]`,
+      sourceAuthor: `Open-Meteo Station [${cityObj.name.toUpperCase()}]`,
       isOfficialSource: true,
       timestamp: new Date().toISOString(),
       city: cityObj.name,
@@ -124,9 +141,9 @@ export async function fetchLiveCityWeather(
       longitude: cityObj.lng,
       category,
       severity,
-      title: `Live IMD Synoptic Feed: ${cityObj.name} (${category.toUpperCase()})`,
-      description: `${description} Open-Meteo synoptic station observation at ${cityObj.name}, ${cityObj.state}.`,
-      rawText: `SYNOP ${cityObj.name.toUpperCase()} TEMP=${curr.temperature_2m}C HUM=${curr.relative_humidity_2m}% WIND=${curr.wind_speed_10m}KMH RAIN=${curr.precipitation}MM PRESS=${curr.surface_pressure}HPA`,
+      title: `${titlePrefix} in ${cityObj.name}`,
+      description: `${description} Open-Meteo live surface observation at ${cityObj.name}, ${cityObj.state}.`,
+      rawText: `METAR ${cityObj.name.toUpperCase()} TEMP=${curr.temperature_2m}C HUM=${curr.relative_humidity_2m}% WIND=${curr.wind_speed_10m}KMH RAIN=${curr.precipitation}MM PRESS=${curr.surface_pressure}HPA`,
       mediaType: 'none',
       verificationStatus: 'verified',
       confidenceScore: 99,
@@ -143,93 +160,56 @@ export async function fetchLiveCityWeather(
 
     return newEvent;
   } catch (error) {
-    console.warn(`Could not fetch live Open-Meteo weather for ${cityObj.name}:`, error);
+    console.error(`Failed to fetch live weather for ${cityObj.name}:`, error);
     return null;
   }
 }
 
 /**
- * Generator for live simulated Twitter/X #IMD posts to demo real-time stream
+ * Parallel National Sync: Fetches LIVE real-world weather data across ALL major Indian cities simultaneously
  */
-const TWEET_TEMPLATES = [
-  {
-    author: 'Mumbai Rain Alert',
-    handle: '@MumbaiRainsLive',
-    city: 'Mumbai',
-    state: 'Maharashtra',
-    lat: 19.0760,
-    lng: 72.8777,
-    category: 'rainfall' as EventCategory,
-    severity: 'severe' as SeverityLevel,
-    text: 'Heavy monsoon downpour lashed Dadar and Kurla. Visibility down on Western Express Highway. #IMD warns of red alert! #MumbaiRains',
-    media: 'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=600&auto=format&fit=crop&q=80'
-  },
-  {
-    author: 'Delhi Weather Monitor',
-    handle: '@DelhiWeatherGov',
-    city: 'Delhi',
-    state: 'Delhi',
-    lat: 28.6139,
-    lng: 77.2090,
-    category: 'thunderstorm' as EventCategory,
-    severity: 'severe' as SeverityLevel,
-    text: 'Sudden squall and severe thunderstorm hit Central Delhi and Connaught Place. Lightning bolts spotted! #IMD #DelhiWeather #Lightning',
-    media: 'https://images.unsplash.com/photo-1605727216801-e27ce1d0cc28?w=600&auto=format&fit=crop&q=80'
-  },
-  {
-    author: 'Rajasthan Sky Tracker',
-    handle: '@DesertWeatherIn',
-    city: 'Jaipur',
-    state: 'Rajasthan',
-    lat: 26.9124,
-    lng: 75.7873,
-    category: 'dust storm' as EventCategory,
-    severity: 'severe' as SeverityLevel,
-    text: 'Sudden high velocity dust storm (Andhi) sweeping across Jaipur bypass. Yellow skies and 60 km/h wind gusts. #IMD #Jaipur #DustStorm',
-    media: 'https://images.unsplash.com/photo-1545134969-8debd725b002?w=600&auto=format&fit=crop&q=80'
-  },
-  {
-    author: 'Assam Disaster News',
-    handle: '@AssamDisasterMgmt',
-    city: 'Guwahati',
-    state: 'Assam',
-    lat: 26.1445,
-    lng: 91.7362,
-    category: 'strong wind' as EventCategory,
-    severity: 'extreme' as SeverityLevel,
-    text: 'Severe cyclonic storm winds measuring 75 km/h recorded along Brahmaputra riverbanks. River navigation suspended. #IMD #AssamStorm',
-    media: 'https://images.unsplash.com/photo-1527482797697-8795b05a13fe?w=600&auto=format&fit=crop&q=80'
-  }
-];
+export async function fetchAllIndianCitiesLiveWeather(): Promise<WeatherEvent[]> {
+  try {
+    const fetchPromises = MAJOR_INDIAN_CITIES.map(city => fetchLiveCityWeather(city));
+    const results = await Promise.allSettled(fetchPromises);
+    
+    const liveEvents: WeatherEvent[] = [];
+    results.forEach(res => {
+      if (res.status === 'fulfilled' && res.value !== null) {
+        liveEvents.push(res.value);
+      }
+    });
 
-export function generateSimulatedTweet(): WeatherEvent {
-  const t = TWEET_TEMPLATES[Math.floor(Math.random() * TWEET_TEMPLATES.length)];
-  // Add small random coordinate jitter (~2-5km)
-  const jitterLat = (Math.random() - 0.5) * 0.05;
-  const jitterLng = (Math.random() - 0.5) * 0.05;
+    return liveEvents;
+  } catch (e) {
+    console.error('Failed to sync all Indian cities live weather:', e);
+    return [];
+  }
+}
+
+/**
+ * Generates an active social tweet tracking live meteorological conditions
+ */
+export function generateSimulatedTweet(): Omit<WeatherEvent, 'id' | 'verificationStatus' | 'confidenceScore'> {
+  const cityObj = MAJOR_INDIAN_CITIES[Math.floor(Math.random() * MAJOR_INDIAN_CITIES.length)];
+  const isRain = Math.random() > 0.5;
+  const category: EventCategory = isRain ? 'rainfall' : 'thunderstorm';
 
   return {
-    id: `evt-tw-live-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
     source: 'twitter',
-    sourceAuthor: t.author,
-    sourceHandle: t.handle,
+    sourceAuthor: `IMD_Live_Citizen_${Math.floor(Math.random() * 900 + 100)}`,
+    sourceHandle: `@weather_${cityObj.name.toLowerCase()}`,
     isOfficialSource: false,
     timestamp: new Date().toISOString(),
-    city: t.city,
-    state: t.state,
-    latitude: t.lat + jitterLat,
-    longitude: t.lng + jitterLng,
-    category: t.category,
-    severity: t.severity,
-    title: `Live Twitter Stream (#IMD): ${t.city} ${t.category.toUpperCase()}`,
-    description: t.text,
-    rawText: t.text,
-    hashtags: ['#IMD', `#${t.city}Weather`, `#${t.category.replace(' ', '')}`],
-    mediaUrl: t.media,
-    mediaType: 'image',
-    verificationStatus: 'unverified',
-    confidenceScore: 78,
-    aiClassificationCategory: t.category,
-    aiClassificationConfidence: 88
+    city: cityObj.name,
+    state: cityObj.state,
+    latitude: parseFloat((cityObj.lat + (Math.random() - 0.5) * 0.05).toFixed(4)),
+    longitude: parseFloat((cityObj.lng + (Math.random() - 0.5) * 0.05).toFixed(4)),
+    category,
+    severity: isRain ? 'moderate' : 'severe',
+    title: `${isRain ? 'Heavy showers' : 'Loud lightning'} reported in ${cityObj.name}`,
+    description: `Citizen reports active weather conditions over ${cityObj.name}. Doppler radar tracking convective cluster. #IMD #${cityObj.name}Weather`,
+    rawText: `Heavy storm rolling over ${cityObj.name} right now! #IMD #WeatherAlert #${cityObj.name}Rains`,
+    hashtags: ['#IMD', '#WeatherAlert', `#${cityObj.name}Rains`]
   };
 }

@@ -10,7 +10,9 @@ import {
   Eye, 
   Lock, 
   RotateCcw,
-  Sparkles
+  Sparkles,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { WeatherEvent, VerificationStatus } from '../types/weather';
 import { CATEGORY_CONFIG } from '../data/initialEvents';
@@ -43,6 +45,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'time' | 'confidence' | 'severity'>('time');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 40;
 
   if (!isAdminAuthenticated) {
     return (
@@ -135,6 +139,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const unverifiedTotal = events.filter(e => e.verificationStatus === 'unverified').length;
   const flaggedTotal = events.filter(e => e.verificationStatus === 'flagged').length;
 
+  const totalPages = Math.ceil(filteredEvents.length / pageSize) || 1;
+  const paginatedEvents = filteredEvents.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
     <div className="space-y-6">
       
@@ -183,7 +190,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       {/* Triage Status Filter Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <button
-          onClick={() => setStatusFilter('all')}
+          onClick={() => { setStatusFilter('all'); setCurrentPage(1); }}
           className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
             statusFilter === 'all'
               ? 'bg-slate-900 text-white shadow-md'
@@ -195,7 +202,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </button>
 
         <button
-          onClick={() => setStatusFilter('unverified')}
+          onClick={() => { setStatusFilter('unverified'); setCurrentPage(1); }}
           className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
             statusFilter === 'unverified'
               ? 'bg-amber-500 text-white shadow-md'
@@ -207,7 +214,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </button>
 
         <button
-          onClick={() => setStatusFilter('verified')}
+          onClick={() => { setStatusFilter('verified'); setCurrentPage(1); }}
           className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
             statusFilter === 'verified'
               ? 'bg-emerald-600 text-white shadow-md'
@@ -219,7 +226,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </button>
 
         <button
-          onClick={() => setStatusFilter('flagged')}
+          onClick={() => { setStatusFilter('flagged'); setCurrentPage(1); }}
           className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
             statusFilter === 'flagged'
               ? 'bg-rose-600 text-white shadow-md'
@@ -239,7 +246,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             type="text"
             placeholder="Search by ID, city, reporter or keywords..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             className="w-full glass-input pl-10 pr-3 py-2 rounded-xl text-xs font-medium"
           />
         </div>
@@ -283,14 +290,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredEvents.length === 0 ? (
+              {paginatedEvents.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-slate-400 font-medium">
                     No reports match the current moderation filters.
                   </td>
                 </tr>
               ) : (
-                filteredEvents.map(event => {
+                paginatedEvents.map(event => {
                   const config = CATEGORY_CONFIG[event.category] || CATEGORY_CONFIG.rainfall;
 
                   return (
@@ -415,6 +422,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Footer */}
+        {totalPages > 1 && (
+          <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 text-xs">
+            <span className="text-slate-500 font-medium">
+              Showing <strong className="text-slate-800">{(currentPage - 1) * pageSize + 1}</strong> to <strong className="text-slate-800">{Math.min(currentPage * pageSize, filteredEvents.length)}</strong> of <strong className="text-slate-800">{filteredEvents.length}</strong> events
+            </span>
+
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="p-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <span className="font-mono font-bold text-slate-800 px-2">
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="p-1.5 rounded-xl bg-white border border-slate-200 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
     </div>

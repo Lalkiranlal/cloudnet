@@ -17,6 +17,7 @@ interface MapViewProps {
   events: WeatherEvent[];
   selectedEvent: WeatherEvent | null;
   onSelectEvent: (event: WeatherEvent) => void;
+  onOpenDetails?: (event: WeatherEvent) => void;
   onOpenReportModal: () => void;
   onMoodChange?: (mood: WeatherMood) => void;
 }
@@ -25,6 +26,7 @@ export const MapView: React.FC<MapViewProps> = ({
   events,
   selectedEvent,
   onSelectEvent,
+  onOpenDetails,
   onMoodChange
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -111,7 +113,10 @@ export const MapView: React.FC<MapViewProps> = ({
 
     markersGroupRef.current.clearLayers();
 
-    events.forEach(event => {
+    // Big Data Optimization: Render top 350 most relevant markers to maintain 60 FPS
+    const markersToRender = events.length > 350 ? events.slice(0, 350) : events;
+
+    markersToRender.forEach(event => {
       if (isNaN(event.latitude) || isNaN(event.longitude)) return;
 
       const config = CATEGORY_CONFIG[event.category] || CATEGORY_CONFIG.rainfall;
@@ -199,13 +204,18 @@ export const MapView: React.FC<MapViewProps> = ({
       marker.on('popupopen', () => {
         const btn = document.getElementById(`btn-view-intel-${event.id}`);
         if (btn) {
-          btn.onclick = () => onSelectEvent(event);
+          btn.onclick = () => {
+            onSelectEvent(event);
+            if (onOpenDetails) {
+              onOpenDetails(event);
+            }
+          };
         }
       });
 
       marker.addTo(markersGroupRef.current!);
     });
-  }, [events, pulseEnabled, selectedEvent, onSelectEvent, onMoodChange]);
+  }, [events, pulseEnabled, selectedEvent, onSelectEvent, onOpenDetails, onMoodChange]);
 
   // Center on selected event
   useEffect(() => {

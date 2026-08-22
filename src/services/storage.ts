@@ -1,32 +1,63 @@
 import { WeatherEvent, VerificationStatus } from '../types/weather';
 import { INITIAL_WEATHER_EVENTS } from '../data/initialEvents';
 import { evaluateEventRules } from './processingEngine';
+import { globalSpatialGrid } from './spatialIndex';
 
 const STORAGE_KEY = 'blure_weather_events_v1';
 const ADMIN_AUTH_KEY = 'blure_admin_auth_v1';
 
+// In-memory high-speed cache for Big Data scale
+let inMemoryEventsCache: WeatherEvent[] | null = null;
+
 export function getStoredEvents(): WeatherEvent[] {
+  if (inMemoryEventsCache && inMemoryEventsCache.length > 0) {
+    return inMemoryEventsCache;
+  }
+
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     if (!data) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_WEATHER_EVENTS));
+      inMemoryEventsCache = INITIAL_WEATHER_EVENTS;
+      globalSpatialGrid.insertBatch(INITIAL_WEATHER_EVENTS);
       return INITIAL_WEATHER_EVENTS;
     }
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    inMemoryEventsCache = parsed;
+    globalSpatialGrid.clear();
+    globalSpatialGrid.insertBatch(parsed);
+    return parsed;
   } catch (e) {
     console.error('Failed to parse stored events, resetting to defaults:', e);
+    inMemoryEventsCache = INITIAL_WEATHER_EVENTS;
+    globalSpatialGrid.clear();
+    globalSpatialGrid.insertBatch(INITIAL_WEATHER_EVENTS);
     return INITIAL_WEATHER_EVENTS;
   }
 }
 
 export function saveEvents(events: WeatherEvent[]): void {
+  inMemoryEventsCache = events;
+  globalSpatialGrid.clear();
+  globalSpatialGrid.insertBatch(events);
+
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
-    // Trigger storage event for cross-component reactive sync
-    window.dispatchEvent(new CustomEvent('blure_events_updated', { detail: events }));
+    // If dataset exceeds 4MB, store newest 1000 items in localStorage and keep full in memory/index
+    const serializable = events.length > 1000 ? events.slice(0, 1000) : events;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializable));
   } catch (e) {
-    console.error('Failed to save events to localStorage:', e);
+    console.warn('LocalStorage limit reached; persisting top slice and caching full in memory:', e);
   }
+
+  // Trigger storage event for cross-component reactive sync
+  window.dispatchEvent(new CustomEvent('blure_events_updated', { detail: events }));
+}
+
+export function batchAddEvents(newEvents: WeatherEvent[]): WeatherEvent[] {
+  const current = getStoredEvents();
+  const merged = [...newEvents, ...current];
+  saveEvents(merged);
+  return merged;
 }
 
 export function addEventWithProcessing(
@@ -68,7 +99,10 @@ export function addEventWithProcessing(
   if (ruleResult.isDuplicate && ruleResult.matchedEventId) {
     updatedList = updatedList.map(e => {
       if (e.id === ruleResult.matchedEventId) {
-        return { ...e, duplicateCount: (e.duplicateCount || 0) + 1 };
+        return {
+          ...e,
+          duplicateCount: (e.duplicateCount || 0) + 1
+        };
       }
       return e;
     });
@@ -84,75 +118,40 @@ export function addEventWithProcessing(
 }
 
 export function updateEventStatus(
-  eventId: string,
+  id: string,
   newStatus: VerificationStatus,
   flagReason?: string
 ): WeatherEvent[] {
-  const events = getStoredEvents();
-  const updated = events.map(e => {
-    if (e.id === eventId) {
+  const currentEvents = getStoredEvents();
+  const updated = currentEvents.map(e => {
+    if (e.id === id) {
       return {
         ...e,
         verificationStatus: newStatus,
         flagReason: flagReason || e.flagReason,
-        confidenceScore: newStatus === 'verified' ? 95 : newStatus === 'flagged' ? 20 : e.confidenceScore
+        confidenceScore: newStatus === 'verified' ? Math.max(e.confidenceScore, 95) : 
+                         newStatus === 'flagged' ? 10 : e.confidenceScore
       };
     }
     return e;
   });
+
   saveEvents(updated);
   return updated;
 }
 
-export function deleteEvent(eventId: string): WeatherEvent[] {
-  const events = getStoredEvents();
-  const updated = events.filter(e => e.id !== eventId);
+export function deleteEvent(id: string): WeatherEvent[] {
+  const currentEvents = getStoredEvents();
+  const updated = currentEvents.filter(e => e.id !== id);
   saveEvents(updated);
   return updated;
 }
 
 export function resetToSeedData(): WeatherEvent[] {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_WEATHER_EVENTS));
-  window.dispatchEvent(new CustomEvent('blure_events_updated', { detail: INITIAL_WEATHER_EVENTS }));
+  localStorage.removeItem(STORAGE_KEY);
+  inMemoryEventsCache = INITIAL_WEATHER_EVENTS;
+  saveEvents(INITIAL_WEATHER_EVENTS);
   return INITIAL_WEATHER_EVENTS;
-}
-
-export function exportEventsAsJson(events: WeatherEvent[]): void {
-  const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(events, null, 2));
-  const downloadAnchor = document.createElement('a');
-  downloadAnchor.setAttribute('href', dataStr);
-  downloadAnchor.setAttribute('download', `cloudnet_weather_dataset_${new Date().toISOString().slice(0, 10)}.json`);
-  document.body.appendChild(downloadAnchor);
-  downloadAnchor.click();
-  downloadAnchor.remove();
-}
-
-export function exportEventsAsCsv(events: WeatherEvent[]): void {
-  const headers = ['ID', 'Timestamp', 'City', 'State', 'Latitude', 'Longitude', 'Category', 'Severity', 'Source', 'VerificationStatus', 'ConfidenceScore', 'Title', 'FlagReason'];
-  
-  const rows = events.map(e => [
-    `"${e.id}"`,
-    `"${e.timestamp}"`,
-    `"${e.city}"`,
-    `"${e.state}"`,
-    e.latitude,
-    e.longitude,
-    `"${e.category}"`,
-    `"${e.severity}"`,
-    `"${e.source}"`,
-    `"${e.verificationStatus}"`,
-    e.confidenceScore,
-    `"${e.title.replace(/"/g, '""')}"`,
-    `"${(e.flagReason || '').replace(/"/g, '""')}"`
-  ]);
-
-  const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-  const downloadAnchor = document.createElement('a');
-  downloadAnchor.setAttribute('href', encodeURI(csvContent));
-  downloadAnchor.setAttribute('download', `cloudnet_weather_records_${new Date().toISOString().slice(0, 10)}.csv`);
-  document.body.appendChild(downloadAnchor);
-  downloadAnchor.click();
-  downloadAnchor.remove();
 }
 
 export function getAdminAuthState(): boolean {
@@ -163,10 +162,67 @@ export function getAdminAuthState(): boolean {
   }
 }
 
-export function setAdminAuthState(isAuthed: boolean): void {
+export function setAdminAuthState(authed: boolean): void {
   try {
-    localStorage.setItem(ADMIN_AUTH_KEY, isAuthed ? 'true' : 'false');
+    localStorage.setItem(ADMIN_AUTH_KEY, authed ? 'true' : 'false');
   } catch (e) {
-    console.error('Failed to store admin auth:', e);
+    console.error('Failed to set admin auth in localStorage:', e);
   }
+}
+
+export function exportEventsAsCsv(events: WeatherEvent[]): void {
+  const headers = [
+    'ID',
+    'Timestamp',
+    'City',
+    'State',
+    'Latitude',
+    'Longitude',
+    'Category',
+    'Severity',
+    'Source',
+    'Source Author',
+    'Verification Status',
+    'Confidence Score',
+    'Title',
+    'Description',
+    'Media URL'
+  ];
+
+  const rows = events.map(e => [
+    `"${e.id}"`,
+    `"${e.timestamp}"`,
+    `"${e.city}"`,
+    `"${e.state}"`,
+    e.latitude,
+    e.longitude,
+    `"${e.category}"`,
+    `"${e.severity}"`,
+    `"${e.source}"`,
+    `"${e.sourceAuthor}"`,
+    `"${e.verificationStatus}"`,
+    e.confidenceScore,
+    `"${e.title.replace(/"/g, '""')}"`,
+    `"${e.description.replace(/"/g, '""')}"`,
+    `"${e.mediaUrl || ''}"`
+  ]);
+
+  const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement('a');
+  link.setAttribute('href', encodedUri);
+  link.setAttribute('download', `cloudnet_imd_weather_export_${Date.now()}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+export function exportEventsAsJson(events: WeatherEvent[]): void {
+  const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(events, null, 2));
+  const link = document.createElement('a');
+  link.setAttribute('href', dataStr);
+  link.setAttribute('download', `cloudnet_imd_weather_dataset_${Date.now()}.json`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
